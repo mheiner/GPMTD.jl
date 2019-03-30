@@ -9,6 +9,14 @@ version = "0.3.0"
 [[Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 
+[[BayesInference]]
+deps = ["Dates", "Distributions", "LinearAlgebra", "PDMats", "SpecialFunctions", "StatsBase"]
+git-tree-sha1 = "3ea462569d0344527279da6cd5b13e32d5ac139a"
+repo-rev = "master"
+repo-url = "https://mheiner@bitbucket.org/mheiner/bayesinference.jl.git"
+uuid = "674fc506-cd11-11e8-249e-83dc12bc047a"
+version = "0.1.0"
+
 [[BinDeps]]
 deps = ["Compat", "Libdl", "SHA", "URIParser"]
 git-tree-sha1 = "12093ca6cdd0ee547c39b1870e0c9c3f154d9ca9"

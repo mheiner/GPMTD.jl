@@ -4,6 +4,7 @@ authors = ["Matt Heiner <mheiner@ucsc.edu>"]
 version = "0.1.0"
 
 [deps]
+BayesInference = "674fc506-cd11-11e8-249e-83dc12bc047a"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 MTD = "a95ea8a4-cd18-11e8-0a09-597b01710c15"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"

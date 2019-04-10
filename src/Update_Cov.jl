@@ -1,44 +1,126 @@
 # update_Cov.jl
 
+function getW(κ::T, D::Matrix{T}, corParams::CorParams) where T <: Real
+    κCor = covMat(D, κ, corParams) # not the inteded use of the function, but this works.
+    W = PDMat(κCor + I)
+    Winv1 = W \ ones(T, size(W,1))
+    sumWinv = sum(Winv1)
+    return (W, sumWinv)
+end
 
-function update_Cov!(y::Vector{T}, σ2vec::Vector{T},
-    Cov::Vector{PDMat}, ζ::Vector{Int}, D::Matrix{T}) where T <: Real
+function getSufficients_W(y::Vector{T}, W::PDMat, sumWinv::T,
+    mixcomp_type::MixComponentNormal=MixComponentNormal()) where T <: Real
 
-    R = length(Cov)
+    yhat = sum(y) / sumWinv
+    d = y .- yhat
+    Winvd = W \ d
+    s2 = d'Winvd
 
-    nζ = StatsBase.counts(ζ, 1:R) # the 0s don't have a GP
-    # Fout = Matrix{T}(undef, n, R) # will update in place
+    return (yhat, s2)
+end
 
-    for ℓ = 1:R  # this could be done in parallel
+function lmarg_W(W::PDMat, sumWinv::T, yhat::T, s2::T, σ2::T,
+    priorMixcomponent::PriorMixcomponent_Normal) where T <: Real
 
-        if nζ[ℓ] > 0
+    a1 = logdet(W)
+    a2 = s2 / σ2
+    a3 = log(sumWinv)
+    a40 = σ2 / sumWinv + priorMixcomponent.μ.σ2
+    a4 = log(a40)
+    a5 = yhat^2 / a40
 
-            ζon = (ζ .== ℓ)
-            indx = findall( ζon )
+    return -0.5*( a1 + a2 + a3 + a4 + a5 )
+end
 
-            llik_old = llik_marg( y[indx], σ2vec[ℓ], PDMat(Cov[ℓ].mat[indx, indx]) )
-            lpri_old
+function ldens_proptoIG_Jacobian(lx::T, shape::T, scale::T) where T <: Real
+    ## Jacobian included for log scale
+    x = exp(lx)
+    return -shape * lx - scale / x
+end
 
-            cand
-            Cov_cand  # full for all data points
+function lprior_κCor(lκ::T, lcorParam::T, κHypers::SNR_Hyper_ScInvChiSq, corParamHypers::MaternHyper_ScInvChiSq)
+    la = ldens_proptoIG_Jacobian(lκ, 0.5*κHypers.ν_κ, 0.5*κHypers.ν_κ*κHypers.κ0)
+    lb = ldens_proptoIG_Jacobian(lcorParam, 0.5*corParamHypers.ν_lenscale,
+        0.5*corParamHypers.ν_lenscale*corParamHypers.lenscale0)
+    return la + lb
+end
 
-            llik_new = llik_marg( y[indx], σ2vec[ℓ], PDMat(Cov[ℓ].mat[indx, indx]) )
-            lpri_new
+function update_Cov!(mixcomp::MixComponentNormal, y::Vector{T}, # assumes y is full
+    κHypers_type::SNR_Hyper_ScInvChiSq, corParamHypers_type::MaternHyper_ScInvChiSq) where T <: Real
 
-            lar = llik_new + lpri_new - llik_old - lpri_old
+    nζon = length(mixcomp.ζon_indx)
 
-            if log(rand()) < lar
+    lκ_old = log(mixcomp.κ)
+    lcorParam_old = log(mixcomp.corParams.lenscale)
 
-            end
+    if nζon > 0
 
-        else # if no observations assigned to lag ℓ
+        W_old, sumWinv_old = getW(mixcomp.κ, mixcomp.D[mixcomp.ζon_indx, mixcomp.ζon_indx], mixcomp.corParams)
+        yhat_old, s2_old =  getSufficients_W(y[mixcomp.ζon_indx], W_old, sumWinv_old)
 
-            new
-            Cov[ℓ]
+        llik_old = lmarg_W(W_old, sumWinv_old, yhat_old, s2_old, mixcomp.σ2, priorMixcomponent)
+        lpri_old = lprior_κCor(lκ_old, lcorParam_old, mixcomp.κ_hypers, mixcomp.corHypers)
 
+        cand = [ lκ_old, lcorParam_old ] + rand(mixcomp.rng, MvNormal(mixcomp.cSig))
+        κ_cand = exp(cand[1])
+        corParams_cand = deepcopy(mixcomp.corParams)
+        corParams_cand.lenscale = exp(cand[2])
+
+        W_cand, sumWinv_cand = getW(κ_cand, mixcomp.D[mixcomp.ζon_indx, mixcomp.ζon_indx], corParams_cand)
+        yhat_cand, s2_cand =  getSufficients_W(y[mixcomp.ζon_indx], W_cand, sumWinv_cand)
+
+        llik_cand = lmarg_W(W_cand, sumWinv_cand, yhat_cand, s2_cand, mixcomp.σ2, priorMixcomponent)
+        lpri_cand = lprior_κCor(cand[1], cand[2], mixcomp.κ_hypers, mixcomp.corHypers)
+
+        lar = llik_cand + lpri_cand - llik_old - lpri_old
+
+        if log(rand(mixcomp.rng)) < lar
+            mixcomp.κ = deepcopy(κ_cand)
+            mixcomp.corParams = deepcopy(corParams_cand)
+            mixcomp.Cor = corrMat(mixcomp.D, mixcomp.corParams)
+            mixcomp.accpt += 1
+
+            lparams_out = deepcopy(cand)
+            out = Dict(:sumWinv => sumWinv_cand, :yhat => yhat_cand, :s2 => s2_cand)
+        else
+            lparams_out = vcat(deepcopy(lκ_old), deepcopy(lcorParam_old))
+            out = Dict(:sumWinv => sumWinv_old, :yhat => yhat_old, :s2 => s2_old)
         end
 
+    else # if no observations assigned to the updated lag
+
+        lpri_old = lprior_κCor(lκ_old, lcorParam_old, mixcomp.κ_hypers, mixcomp.corHypers)
+
+        cand = [ lκ_old, lcorParam_old ] + rand(mixcomp.rng, MvNormal(mixcomp.cSig))
+        κ_cand = exp(cand[1])
+        corParams_cand = deepcopy(mixcomp.corParams)
+        corParams_cand.lenscale = exp(cand[2])
+
+        lpri_cand = lprior_κCor(cand[1], cand[2], mixcomp.κ_hypers, mixcomp.corHypers)
+
+        lar = lpri_cand - lpri_old
+
+        if log(rand(mixcomp.rng)) < lar
+            mixcomp.κ = deepcopy(κ_cand)
+            mixcomp.corParams = deepcopy(corParams_cand)
+            mixcomp.Cor = corrMat(mixcomp.D, mixcomp.corParams)
+            mixcomp.accpt += 1
+
+            lparams_out = deepcopy(cand)
+            out = Dict(:sumWinv => sumWinv_cand, :yhat => yhat_cand, :s2 => s2_cand)
+        else
+            lparams_out = vcat(deepcopy(lκ_old), deepcopy(lcorParam_old))
+            out = Dict()
+        end
     end
 
-    return nothing
+    if mixcomp.adapt
+        mixcomp.adapt_iter += 1
+        mixcomp.runningsum_Met += lparams_out
+        runningmean = mixcomp.runningsum_Met / float(mixcomp.adapt_iter)
+        runningdev = ( lparams_out - runningmean )
+        mixcomp.runningSS_Met = runningdev * runningdev' # the mean is changing, but this approx. is fine.
+    end
+
+    return out
 end

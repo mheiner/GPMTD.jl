@@ -1,24 +1,30 @@
 # Update_alloc.jl
 
-function rpost_ζ_mtdg(S::Vector{Int}, TT::Int,
-  lλ::Vector{Float64}, lQ0::Vector{Float64}, lQ::Vector{Matrix{Float64}},
-  R::Int, K::Int)
+function update_ζ!(y::Vector{T}, state::State_GPMTD, mixcomp_type::MixComponentNormal)
 
-  ζ_out = Vector{Int}(undef, TT-R)
+    n = length(y)
+    R = length(state.mixcomps)
+    lp = Vector{Float64}(undef, R+1)
 
-  for i in 1:(TT-R)
-      tt = i + R
-      Slagrev_now = S[range(tt-1, step=-1, length=R)]
-      lp = Vector{Float64}(undef, R+1)
+    for i = 1:n
 
-      lp[1] = lλ[1] + lQ0[S[tt]]
-      for j in 1:R
-          lp[j] = lλ[j+1] + lQ[j][ append!([deepcopy(S[tt])], deepcopy(Slagrev_now[j]))... ]
-      end
+        lp[1] = lλ[1] - 0.5*log(state.intercept.σ2) -
+            0.5 * (y[i] - state.intercept.μ)^2 / state.intercept.σ2
 
-      w = exp.( lp .- maximum(lp) )
-      ζ_out[i] = StatsBase.sample(Weights(w)) - 1 # so that the values are 0:R
-  end
+        for j in 1:R
+            lp[j] = lλ[j+1] -
+                0.5*log(state.mixcomps[j].σ2) -
+                0.5 * (y[i] - state.mixcomps[j].μ - state.mixcomps[j].fx[i])^2 / state.mixcomps[j].σ2
+        end
 
-  ζ_out
+        w = exp.( lp .- maximum(lp) )
+        state.ζ[i] = StatsBase.sample(Weights(w)) - 1 # so that the values are 0:R
+
+    end
+
+    for ℓ = 1:R
+        state.mixcomps[ℓ].ζon_indx = findall( state.ζ .== ℓ )
+    end
+
+    return nothing
 end

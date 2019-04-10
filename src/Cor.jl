@@ -1,10 +1,28 @@
 # corFun.jl
 
-export MaternParams, corr, corMat, covMat, PDMat_adj;
+export CorParams, MaternParams,
+    CorHypers, MaternHyper_ScInvChiSq,
+    corr, corMat, covMat, PDMat_adj;
 
-struct MaternParams
+abstract type CorParams end
+
+mutable struct MaternParams <: CorParams
     ν::Real
     lenscale::Real
+    MaternParams(ν, lenscale) = ν > 0.0 && lenscale > 0.0 ? new(ν, lenscale) : error("Both parameters must be positive.")
+end
+function MaternParams()
+    MaternParams(2.5, 1.0)
+end
+
+abstract type CorHypers end
+
+mutable struct MaternHyper_ScInvChiSq <: CorHypers
+    ν_lenscale::Real
+    lenscale0::Real
+end
+function MaternHyper_ScInvChiSq()
+    MaternHyper_ScInvChiSq(2.5, 1.5)
 end
 
 function corr(d::T, params::MaternParams; logout::Bool=false) where T <: Real
@@ -89,7 +107,7 @@ function covMat(D::Matrix{T}, variance::T, params::MaternParams; tol::Float64=1.
             end
         end
 
-        C = PDMat_adj(C, tol)
+        # C = PDMat_adj(C, tol) # do this manually where you need it.
 
     else
 

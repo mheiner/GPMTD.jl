@@ -1,7 +1,7 @@
 # Update_int.jl
 
-function update_interc_params!(μ::T, σ2::T, y::Vector{T}, ζ::Vector{Int},
-    prior_μ::, prior_σ2::) where T <: Real
+function update_interc_params!(intercept::InterceptNormal,
+    prior::PriorIntercept_Normal, y::Vector{T}, ζ::Vector{Int}) where T <: Real
 
     ## y is not already subsetted
     indx = findall( ζ .== 0 )
@@ -9,18 +9,18 @@ function update_interc_params!(μ::T, σ2::T, y::Vector{T}, ζ::Vector{Int},
     sumy = sum( y[indx] )
 
     ## mean
-    v1 = 1.0 / ( 1.0 / prior_μ.v0 + n / σ2 )
+    v1 = 1.0 / ( 1.0 / prior.μ.σ2 + n / intercept.σ2 )
     sd1 = sqrt(v1)
-    μ1 = v1 * ( prior_μ.μ0 / v0 + sumy / σ2 )
+    μ1 = v1 * ( prior.μ.μ / prior.μ.σ2 + sumy / intercept.σ2 )
 
-    μ = rand( Distributions.Normal(μ1, sd1) )
+    intercept.μ = rand( Distributions.Normal(μ1, sd1) )
 
     ## variance
-    a1 = 0.5 * ( prior_σ2.ν + n )
-    ss = sum( ( y[indx] .- μ ).^2 )
-    b1 = 0.5 * ( prior_σ2.ν * prior_σ2.s0 + ss )
+    a1 = 0.5 * ( prior.σ2.ν + n )
+    ss = sum( ( y[indx] .- intercept.μ ).^2 )
+    b1 = 0.5 * ( prior.σ2.ν * prior.σ2.s0 + ss )
 
-    σ2 = rand( Distributions.InverseGamma(a1, b1) )
+    intercept.σ2 = rand( Distributions.InverseGamma(a1, b1) )
 
     return nothing
 end

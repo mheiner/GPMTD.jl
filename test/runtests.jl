@@ -4,6 +4,9 @@ using Test
 # @test hello("Julia") == "Hello, Julia"
 # @test domath(2.0) ≈ 7.0
 
+## test Distributions.Gamma
+mean(Gamma(2.0, 0.5)) ≈ 1.0 # the second parameter is the shape
+
 ## Assure that Distances doesn't change
 x = [0.0, 1.0, 1.0]
 a = [[0.0, 1.0, 1.0] [1.0, 0.0, 0.0] [1.0, 0.0, 0.0]]
@@ -42,3 +45,8 @@ CovXY = covMat(Dxy, v, mp, tol=1.0e-10)
 # @benchmark logpdf( MvNormal( $Cov + $σ2*I ), $y)
 
 rpost_MvNNV(y, σ2, Cov)
+
+x_old = reshape(randn(3), 3, 1)
+x_new = 0.0
+D = pairDistMat(x_old)
+expanD(D, x_new, x_old)

@@ -48,34 +48,44 @@ end
 
 ### worker function that operates on its own
 function update_mixcomp!(mixcomp::MixComponentNormal, prior::PriorMixcomponent_Normal,
-    y::Vector{T}) where T <: Real
+    y::Vector{T}, update::Vector{Symbol}=[:μ, :σ2,
+        :κ, :corParams, :fx]) where T <: Real
 
     nζ = length(mixcomp.ζon_indx)
 
-    suffstat = update_Cov!(mixcomp, y, SNR_Hyper_ScInvChiSq(), MaternHyper_ScInvChiSq())
+    if (:κ in update) || (:corParams in update)
+        suffstat = update_Cov!(mixcomp, y, SNR_Hyper_ScInvChiSq(), MaternHyper_ScInvChiSq())
+    end
 
     if nζ > 0
 
-        update_μ_σ2!(mixcomp, suffstat, prior)
+        if (:μ in update) || (:σ2 in update)
+            update_μ_σ2!(mixcomp, suffstat, prior)
+        end
 
-        mixcomp.fx[mixcomp.ζon_indx] = rpost_f(y[mixcomp.ζon_indx], mixcomp.μ, mixcomp.σ2,
-            mixcomp.κ, mixcomp.Cor, mixcomp.rng)
+        if (:fx in update)
+            mixcomp.fx[mixcomp.ζon_indx] = rpost_f(y[mixcomp.ζon_indx], mixcomp.μ, mixcomp.σ2,
+                mixcomp.κ, mixcomp.Cor, mixcomp.rng)
 
-        ζoff_indx = setdiff( 1:length(y) , mixcomp.ζon_indx )
-        Cov = PDMat_adj(mixcomp.Cor .* (mixcomp.κ * mixcomp.σ2))
+            ζoff_indx = setdiff( 1:length(y) , mixcomp.ζon_indx )
+            Cov = PDMat_adj(mixcomp.Cor .* (mixcomp.κ * mixcomp.σ2))
 
-        mixcomp.fx[ζoff_indx] = rfullcond_fstar(mixcomp.fx[mixcomp.ζon_indx],
-            Cov.mat[mixcomp.ζon_indx, mixcomp.ζon_indx], Cov.mat[ζoff_indx, ζoff_indx],
-            Cov.mat[ζoff_indx, mixcomp.ζon_indx], mixcomp.rng)
+            mixcomp.fx[ζoff_indx] = rfullcond_fstar(mixcomp.fx[mixcomp.ζon_indx],
+                Cov.mat[mixcomp.ζon_indx, mixcomp.ζon_indx], Cov.mat[ζoff_indx, ζoff_indx],
+                Cov.mat[ζoff_indx, mixcomp.ζon_indx], mixcomp.rng)
+        end
 
     else
 
-        mixcomp.μ = rand(mixcomp.rng, Normal(prior.μ.μ, sqrt(prior.μ.σ2)))
-        mixcomp.σ2 = rand(mixcomp.rng, InverseGamma(0.5*prior.σ2.ν, 0.5*prior.σ2.ν*prior.σ2.s0))
+        if (:μ in update) || (:σ2 in update)
+            mixcomp.μ = rand(mixcomp.rng, Normal(prior.μ.μ, sqrt(prior.μ.σ2)))
+            mixcomp.σ2 = rand(mixcomp.rng, InverseGamma(0.5*prior.σ2.ν, 0.5*prior.σ2.ν*prior.σ2.s0))
+        end
 
-        Cov = PDMat_adj(mixcomp.Cor .* (mixcomp.κ * mixcomp.σ2))
-        mixcomp.fx = rand(mixcomp.rng, Distributions.MvNormal( Cov ) )
-
+        if (:fx in update)
+            Cov = PDMat_adj(mixcomp.Cor .* (mixcomp.κ * mixcomp.σ2))
+            mixcomp.fx = rand(mixcomp.rng, Distributions.MvNormal( Cov ) )
+        end
     end
 
     return mixcomp
@@ -83,7 +93,8 @@ end
 
 
 ### master function that calls parallel updates
-function update_mixcomps!(state::State_GPMTD, prior::Prior_GPMTD, y::Vector{T}) where T <: Real
+function update_mixcomps!(state::State_GPMTD, prior::Prior_GPMTD, y::Vector{T},
+    update::Vector{Symbol}=[:μ, :σ2, :κ, :corParams, :fx]) where T <: Real
 
     R = length(state.mixcomps)
 
@@ -91,7 +102,8 @@ function update_mixcomps!(state::State_GPMTD, prior::Prior_GPMTD, y::Vector{T}) 
         state.mixcomp[ℓ].adapt = state.adapt
     end
 
-    state.mixcomps = pmap(update_mixcomp!, state.mixcomps, prior.mixcomps, fill(y, R)) # pmap will update in place on each worker, but we also need to return the mixcomps
+    state.mixcomps = pmap(update_mixcomp!, state.mixcomps, prior.mixcomps,
+        fill(y, R), fill(update, R)) # pmap will update in place on each worker, but we also need to return the mixcomps
 
     state.accpt = [ deepcopy(state.mixcomp[ℓ].accpt) for ℓ = 1:R ]
 

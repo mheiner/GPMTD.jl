@@ -66,9 +66,9 @@ end
 abstract type SNR_Hyper end
 
 mutable struct SNR_Hyper_ScInvChiSq <: SNR_Hyper
-    ν_κ::Real
+    κ_ν::Real
     κ0::Real
-    SNR_Hyper_ScInvChiSq(ν_κ, κ0) = ν_κ > 0.0 && κ0 > 0.0 ? new(ν_κ, κ0) : error("Both parameters must be positive.")
+    SNR_Hyper_ScInvChiSq(κ_ν, κ0) = κ_ν > 0.0 && κ0 > 0.0 ? new(κ_ν, κ0) : error("Both parameters must be positive.")
 end
 function SNR_Hyper_ScInvChiSq()
     SNR_Hyper_ScInvChiSq(2.5, 3.5)

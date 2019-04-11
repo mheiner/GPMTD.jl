@@ -18,7 +18,7 @@ end
 abstract type CorHypers end
 
 mutable struct MaternHyper_ScInvChiSq <: CorHypers
-    ν_lenscale::Real
+    lenscale_ν::Real
     lenscale0::Real
 end
 function MaternHyper_ScInvChiSq()

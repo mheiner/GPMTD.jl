@@ -25,11 +25,18 @@ function rpost_ScInvChiSq_s0(y::Vector{T}, ν::T, prior::GammaParams)
     return rand(Distributions.Gamma(a1, 1.0/b1))
 end
 
+function rpost_ScInvChiSq_ν(y::Vector{T}, s0::T, prior::Vector{T}) where T <: Real
+    ## Here the prior is a vector of values representing a discrete uniform over them.
+    lp = [ llik_ScInvChiSq(y, nu, s0) for nu in prior ]
+    w = exp.( lp .- maximum(lp) )
+    return StatsBase.sample(prior, Weights(w))
+end
+
 function update_cov_hypers!(state::State_GPMTD, prior::PriorCovHyper_Matern) where T <: Real
 
     R = length(state.mixcomps)
 
-    nζ = StatsBase.counts(state.ζ, 1:R) # intercept does not contain these parameters
+    nζ = StatsBase.counts(state.ζ, 1:R) # intercept does not involve these parameters
     use_indx = findall( nζ .> 0 )
 
     if length(use_indx) > 0
@@ -37,11 +44,28 @@ function update_cov_hypers!(state::State_GPMTD, prior::PriorCovHyper_Matern) whe
         κ_dat = [ state.mixcomp[j].κ for j in use_indx ]
         lenscale_dat = [ state.mixcomp[j].corParams.lenscale for j in use_indx ]
 
+        κ_ν_out = rpost_ScInvChiSq_ν(κ_dat, state.mixcomps[1].κ_hypers.κ0, prior.κ_ν)
+        κ0_out = rpost_ScInvChiSq_s0(κ_dat, κ_ν_out, prior.κ0)
 
+        lenscale_ν_out = rpost_ScInvChiSq_ν(lenscale_dat, state.mixcomps[1].corHypers.lenscale0, prior.lenscale_ν)
+        lenscale0_out = rpost_ScInvChiSq_s0(lenscale_dat, lenscale_ν_out, prior.lenscale0)
 
     else
 
+        κ_ν_out = StatsBase.sample(prior.κ_ν)
+        κ0_out = rand(Distributions.Gamma(prior.κ0.shape, 1.0/prior.κ0.rate))
 
+        lenscale_ν_out = StatsBase.sample(prior.lenscale_ν)
+        lenscale0_out = rand(Distributions.Gamma(prior.lenscale0.shape, 1.0/prior.lenscale0.rate))
+
+    end
+
+    # update these parameters in all mixcomps
+    for ℓ = 1:R
+        state.mixcomps[ℓ].κ_hypers.κ_ν = κ_ν_out
+        state.mixcomps[ℓ].κ_hypers.κ0 = κ0_out
+        state.mixcomps[ℓ].corHypers.lenscale_ν = lenscale_ν_out
+        state.mixcomps[ℓ].corHypers.lenscale0 = lenscale0_out
     end
 
     return nothing

@@ -39,9 +39,9 @@ function ldens_proptoIG_Jacobian(lx::T, shape::T, scale::T) where T <: Real
 end
 
 function lprior_κCor(lκ::T, lcorParam::T, κHypers::SNR_Hyper_ScInvChiSq, corParamHypers::MaternHyper_ScInvChiSq)
-    la = ldens_proptoIG_Jacobian(lκ, 0.5*κHypers.ν_κ, 0.5*κHypers.ν_κ*κHypers.κ0)
-    lb = ldens_proptoIG_Jacobian(lcorParam, 0.5*corParamHypers.ν_lenscale,
-        0.5*corParamHypers.ν_lenscale*corParamHypers.lenscale0)
+    la = ldens_proptoIG_Jacobian(lκ, 0.5*κHypers.κ_ν, 0.5*κHypers.κ_ν*κHypers.κ0)
+    lb = ldens_proptoIG_Jacobian(lcorParam, 0.5*corParamHypers.lenscale_ν,
+        0.5*corParamHypers.lenscale_ν*corParamHypers.lenscale0)
     return la + lb
 end
 

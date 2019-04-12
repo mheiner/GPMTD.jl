@@ -268,7 +268,7 @@ function Model_GPMTD(y::Vector{T}, X::Matrix{T}, prior::Prior_GPMTD,
 
     n == nx || throw("Lengths of X and y differ.")
 
-    D = [ pairDistMat(X[:,ℓ]) for ℓ = 1:R ]
+    D = [ pairDistMat(X[:,[ℓ]]) for ℓ = 1:R ]
 
     return Model_GPMTD(y, X, prior, state, n, R, D)
 end

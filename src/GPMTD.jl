@@ -26,5 +26,6 @@ include("Update_weights.jl")
 include("Update_CovHypers.jl")
 include("Lik.jl")
 include("Sim.jl")
+include("mcmc.jl")
 
 end # module

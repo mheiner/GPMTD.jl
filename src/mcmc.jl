@@ -13,9 +13,9 @@ function deepcopyFields(state::T, fields::Vector{Symbol}) where T
   return substate
 end
 
-function postSimsInit(monitor::Vector{Symbol}=[:intercept, :lλ, :μ, :σ2, :κ,
-    :κ_hypers, :corParams, :corHypers, :fx],
-    n_keep::Int, init_state::Union{State_GPMTD})
+function postSimsInit(n_keep::Int, init_state::Union{State_GPMTD},
+    monitor::Vector{Symbol}=[:intercept, :lλ, :μ, :σ2, :κ,
+        :κ_hypers, :corParams, :corHypers, :fx])
 
     R = length(init_state.mixcomps)
 
@@ -37,7 +37,7 @@ function timemod!(n::Int64, model::Union{Model_GPMTD}, niter::Int, outfilename::
     outfile = open(outfilename, "a+")
     write(outfile, "timing for $(niter) iterations each:\n")
     for i in 1:n
-        tinfo = @timed mcmc!(model, niter, false, outfilename)
+        tinfo = @timed mcmc!(model, niter)
         write(outfile, "trial $(i), elapsed: $(tinfo[2]) seconds, allocation: $(tinfo[3]/1.0e6) Megabytes\n")
     end
     close(outfile)
@@ -57,22 +57,15 @@ function etr(timestart::DateTime, n_keep::Int, thin::Int, outfilename::String)
     close(report_file)
 end
 
-
 function mcmc!(model::Model_GPMTD, n_keep::Int;
     save::Bool=true,
     thin::Int=1,
-    n_workers::Int=0,
     report_filename::String="out_progress.txt",
     report_freq::Int=10000,
     update::Vector{Symbol}=[:intercept, :lλ, :ζ, :μ, :σ2,
         :κ, :κ_hypers, :corParams, :corHypers, :fx],
     monitor::Vector{Symbol}=[:intercept, :lλ, :μ, :σ2,
         :κ, :κ_hypers, :corParams, :corHypers, :fx])
-
-    ## set up cores for distributed updates of mixcomps
-    n_workers < length(Sys.cpu_info()) - 1 || throw("Too many processes designated.")
-    addprocs(n_workers)
-    @everywhere using Random123, GPMTD
 
     ## output files
     report_file = open(report_filename, "a+")
@@ -86,7 +79,7 @@ function mcmc!(model::Model_GPMTD, n_keep::Int;
 
     ## collect posterior samples
     if save
-        sims = postSimsInit(monitor, n_keep, model.state)
+        sims = postSimsInit(n_keep, model.state, monitor)
         monitor_outer = intersect(monitor, fieldnames(typeof(model.state)))
         monitor_mixcomps = intersect(monitor, fieldnames(typeof(model.state.mixcomps[1])))
     end
@@ -121,9 +114,9 @@ function mcmc!(model::Model_GPMTD, n_keep::Int;
                 update_cov_hypers!(model.state, model.prior.covhyper)
             end
 
-            model.iter += 1
-            if model.iter % report_freq == 0
-                write(report_file, "Iter $(model.iter) at $(Dates.now())\n")
+            model.state.iter += 1
+            if model.state.iter % report_freq == 0
+                write(report_file, "Iter $(model.state.iter) at $(Dates.now())\n")
                 write(report_file, "Log-likelihood $(model.state.llik)\n")
                 write(report_file, "Current Metropolis acceptance rates: $(float((model.state.accpt - prev_accpt) / report_freq))\n\n")
                 prev_accpt = deepcopy(model.state.accpt)
@@ -136,16 +129,13 @@ function mcmc!(model::Model_GPMTD, n_keep::Int;
                 sims[i][field] = deepcopy(getfield(model.state, field))
             end
             for field in monitor_mixcomps
-                sims[i][:mixcomps] = [ deepcopy(getfield(model.state.mixcomps[j], monitor_mixcomps)) for j = 1:model.R ]
+                sims[i][:mixcomps] = [ deepcopy(getfield(model.state.mixcomps[j], field)) for j = 1:model.R ]
             end
             sims[i][:llik] = llik(model)
         end
 
     end
 
-    if n_workers > 0
-        rmprocs(workers())
-    end
     close(report_file)
 
     accptr = float(model.state.accpt - start_accpt) ./ float(model.state.iter - start_iter)
@@ -153,7 +143,7 @@ function mcmc!(model::Model_GPMTD, n_keep::Int;
     if save
         return (sims, accptr)
     else
-        return (model.iter, accptr)
+        return (model.state.iter, accptr)
     end
 
 end
@@ -174,7 +164,6 @@ function adapt!(model::Model_GPMTD;
     n_iter_collectSS::Int=2000, n_iter_scale::Int=500,
     accptr_bnds::Vector{T}=[0.23, 0.44],
     adjust_bnds::Vector{T}=[0.01, 10.0],
-    nworkers::Int=0,
     maxtries::Int=50,
     report_filename::String="out_progress.txt",
     update::Vector{Symbol}=[:intercept, :lλ, :ζ, :μ, :σ2,
@@ -206,7 +195,7 @@ function adapt!(model::Model_GPMTD;
         end
 
         iter, accptr = mcmc!(model, n_iter_scale, save=false,
-            nworkers=nworkers, report_filename=report_filename,
+            report_filename=report_filename,
             report_freq=n_iter_scale, update=update)
 
         for j = 1:model.R
@@ -246,7 +235,7 @@ function adapt!(model::Model_GPMTD;
                 end
 
                 iter, accptr = mcmc!(model, n_iter_scale, save=false,
-                    nworkers=nworkers, report_filename=report_filename,
+                    report_filename=report_filename,
                     report_freq=n_iter_scale, update=update)
 
                 for j = 1:model.R
@@ -287,7 +276,7 @@ function adapt!(model::Model_GPMTD;
     model.state.adapt = true
 
     iter, accptr = mcmc!(model, n_iter_collectSS, save=false,
-        nworkers=nworkers, report_filename=report_filename,
+        report_filename=report_filename,
         report_freq=1000, update=update)
 
     for j = 1:model.R
@@ -319,7 +308,7 @@ function adapt!(model::Model_GPMTD;
         end
 
         iter, accptr = mcmc!(model, n_iter_scale, save=false,
-            nworkers=nworkers, report_filename=report_filename,
+            report_filename=report_filename,
             report_freq=n_iter_scale, update=update)
 
         for j = 1:model.R
@@ -349,12 +338,13 @@ function adapt!(model::Model_GPMTD;
 end
 
 
-function reset_adapt!(model::Model_DPmRegJoint, nparams::Int=2)
+function reset_adapt!(model::Model_GPMTD, nparams::Int=2)
     model.state.adapt_iter = 0
     R = length(model.state.mixcomps)
     for j = 1:R
         model.state.mixcomps[j].runningsum_Met = zeros( Float64, nparams )
         model.state.mixcomps[j].runningSS_Met = zeros( Float64, nparams, nparams )
     end
+
     return nothing
 end

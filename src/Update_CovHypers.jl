@@ -14,7 +14,7 @@ function llik_ScInvChiSq(y::Vector{T}, ν::T, s0::T) where T <: Real
     return a1 - a2 - a3 - a4
 end
 
-function rpost_ScInvChiSq_s0(y::Vector{T}, ν::T, prior::GammaParams)
+function rpost_ScInvChiSq_s0(y::Vector{T}, ν::T, prior::GammaParams) where T <: Real
     sum1divy = sum(1.0 ./ y)
     n = length(y)
 

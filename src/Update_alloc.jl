@@ -1,6 +1,7 @@
 # Update_alloc.jl
 
-function update_ζ!(y::Vector{T}, state::State_GPMTD, mixcomp_type::MixComponentNormal)
+function update_ζ!(y::Vector{T}, state::State_GPMTD,
+    mixcomp_type::MixComponentNormal) where T <: Real
 
     n = length(y)
     R = length(state.mixcomps)

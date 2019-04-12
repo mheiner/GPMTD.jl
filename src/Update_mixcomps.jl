@@ -33,6 +33,46 @@ function rpost_f(y::Vector{T}, μ::T, σ2::T, κ::T, Cor::Matrix{T},
     rand(rng, Distributions.MvNormalCanon(h, J) )
 end
 
+function rfullcond_fstar(f_ell::T, Celel::T, Cstst::T, Cstel::T,
+    rng::Union{MersenneTwister, Threefry4x}, tol=1.0e-10) where T <: Real
+
+    ## here C is the **Covariance** matrix
+
+    μ = Cstel * ( Celel \ f_ell )
+    Σ = Cstst - Cstel * ( Celel \ Cstel )
+
+    if Σ < 0.0 && abs(Σ) < tol
+        Σ = abs(Σ)
+    end
+
+    return sqrt(Σ) * randn(rng) + μ
+end
+function rfullcond_fstar(f_ell::T, Celel::T,
+    Cstst::Matrix{T}, Cstel::Vector{T},
+    rng::Union{MersenneTwister, Threefry4x}) where T <: Real
+
+    ## here C is the **Covariance** matrix
+
+    μ = Cstel .* f_ell ./ Celel
+    Σ = Cstst - Cstel * Cstel' ./ Celel
+
+    return rand(rng, Distributions.MvNormal( μ, Σ ) )
+end
+function rfullcond_fstar(f_ell::Vector{T}, Celel::Matrix{T},
+    Cstst::T, Cstel::Vector{T},
+    rng::Union{MersenneTwister, Threefry4x}, tol=1.0e-10) where T <: Real
+
+    ## here C is the **Covariance** matrix
+
+    μ = Cstel' * ( Celel \ f_ell )
+    Σ = Cstst - Cstel' * ( Celel \ Cstel )
+
+    if Σ < 0.0 && abs(Σ) < tol
+        Σ = abs(Σ)
+    end
+
+    return sqrt(Σ) * randn(rng) + μ
+end
 function rfullcond_fstar(f_ell::Vector{T}, Celel::Matrix{T},
     Cstst::Matrix{T}, Cstel::Matrix{T},
     rng::Union{MersenneTwister, Threefry4x}) where T <: Real
@@ -42,7 +82,7 @@ function rfullcond_fstar(f_ell::Vector{T}, Celel::Matrix{T},
     μ = Cstel * ( Celel \ f_ell )
     Σ = Cstst - Cstel * ( Celel \ Cstel' )
 
-    rand(rng, Distributions.MvNormal( μ, Σ ) )
+    return rand(rng, Distributions.MvNormal( μ, Σ ) )
 end
 
 

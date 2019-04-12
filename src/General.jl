@@ -16,7 +16,7 @@ export embed,
 
 function embed(y::Vector{T}, nlags::Int; out_sep::Bool=false) where T <: Number
     N = length(y)
-    n = TT - nlags
+    n = N - nlags
     emdim = nlags + 1
     XX = Array{T, 2}(undef, n, emdim)
     for i in 1:n
@@ -74,7 +74,7 @@ function SNR_Hyper_ScInvChiSq()
     SNR_Hyper_ScInvChiSq(2.5, 3.5)
 end
 
-abstract type MixComponentGPMTD
+abstract type MixComponentGPMTD end
 
 mutable struct MixComponentNormal <: MixComponentGPMTD
     μ::Real
@@ -86,7 +86,7 @@ mutable struct MixComponentNormal <: MixComponentGPMTD
     corParams::CorParams
     corHypers::CorHypers # this is updated elsewhere, but dragged along for each mixcomp.
 
-    Cor::PDMat
+    Cor::Matrix{<:Real}
 
     D::Matrix{<:Real} # full size
     fx::Vector{<:Real} # full size (all data points)
@@ -104,13 +104,13 @@ mutable struct MixComponentNormal <: MixComponentGPMTD
 end
 function MixComponentNormal()
 
-    Cor = PDMat(Matrix(LinearAlgebra.Diagonal(1)))
-    D = zeros(Real, 1, 1)
-    fx = zeros(Real, 1)
+    Cor = Matrix(LinearAlgebra.Diagonal([1.0]))
+    D = zeros(Float64, 1, 1)
+    fx = zeros(Float64, 1)
     ζon_indx = ones(Int, 1)
 
     rng = MersenneTwister(0)
-    cSig = PDMat(Matrix(LinearAlgebra.Diagonal(1)))
+    cSig = PDMat(Matrix(LinearAlgebra.Diagonal([1.0])))
 
     return MixComponentNormal(0.0, 1.0, 1.0, SNR_Hyper_ScInvChiSq(), MaternParams(), MaternHyper_ScInvChiSq(),
         Cor, D, fx, ζon_indx, rng, cSig, nothing, nothing, 0, false, 0)
@@ -148,23 +148,23 @@ function State_GPMTD(X::Matrix{T}, intercept::InterceptNormal,
 
     ## populate mixcomps
     for ℓ = 1:R
-        mixcomps_out.D = pairDistMat(X[:,ℓ])
-        mixcomps_out.Cor = covMat(mixcomps_out.D, mixcomps_out.κ*mixcomps_out.σ2, mixcomps_out.corParams)
-        mixcomps_out.fx = fill(1.0, n)
-        mixcomps_out.ζon_indx = Vector{Int}(undef, 0)
+        mixcomps_out[ℓ].D = pairDistMat(X[:,[ℓ]])
+        mixcomps_out[ℓ].Cor = covMat(mixcomps_out[ℓ].D, mixcomps_out[ℓ].κ*mixcomps_out[ℓ].σ2, mixcomps_out[ℓ].corParams)
+        mixcomps_out[ℓ].fx = fill(1.0, n)
+        mixcomps_out[ℓ].ζon_indx = Vector{Int}(undef, 0)
 
         mixcomps_out[ℓ].rng = deepcopy(mixcomps_out[1].rng)
         Random123.set_counter!(mixcomps_out[ℓ].rng, ℓ+1)
 
         mixcomps_out[ℓ].cSig = PDMat(Matrix(LinearAlgebra.Diagonal(fill(0.1, 2))))
-        mixcomps_out[ℓ].runningsum_Met = zeros(Real, 2)
-        mixcomps_out[ℓ].runningSS_Met = zeros(Real, 2, 2)
+        mixcomps_out[ℓ].runningsum_Met = zeros(Float64, 2)
+        mixcomps_out[ℓ].runningSS_Met = zeros(Float64, 2, 2)
     end
 
     lλ = fill( log(1.0/(R+1.0)), R + 1 )
     ζ = zeros(Int, n)
 
-    return State_GPMTD(intercept, mixcomps, lλ, ζ, 0, zeros(Int, R), false, 0, 0.0)
+    return State_GPMTD(intercept, mixcomps_out, lλ, ζ, 0, zeros(Int, R), false, 0, 0.0)
 end
 ## if you want to do another constructor with random inits, create another function with the prior
 
@@ -227,7 +227,7 @@ end
 
 mutable struct Prior_GPMTD
     intercept::PriorIntercept
-    mixcomps::Vector{<:PriorMixComponent}
+    mixcomps::Vector{<:PriorMixcomponent}
     covhyper::PriorCovHyper
     λ::Union{SparseDirMix, SBMprior, Vector{Float64}}
 end
@@ -260,7 +260,8 @@ mutable struct Model_GPMTD
 end
 
 ## outer constructor
-function Model_GPMTD(y::Vector{T}, X::Matrix{T}, prior::Prior_GPMTD, state::State_GPMTD)
+function Model_GPMTD(y::Vector{T}, X::Matrix{T}, prior::Prior_GPMTD,
+    state::State_GPMTD) where T <: Real
 
     n = length(y)
     nx, R = size(X)

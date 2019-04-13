@@ -71,7 +71,7 @@ mutable struct SNR_Hyper_ScInvChiSq <: SNR_Hyper
     SNR_Hyper_ScInvChiSq(κ_ν, κ0) = κ_ν > 0.0 && κ0 > 0.0 ? new(κ_ν, κ0) : error("Both parameters must be positive.")
 end
 function SNR_Hyper_ScInvChiSq()
-    SNR_Hyper_ScInvChiSq(2.5, 3.5)
+    SNR_Hyper_ScInvChiSq(5.0, 7.0/5.0)
 end
 
 abstract type MixComponentGPMTD end
@@ -86,7 +86,7 @@ mutable struct MixComponentNormal <: MixComponentGPMTD
     corParams::CorParams
     corHypers::CorHypers # this is updated elsewhere, but dragged along for each mixcomp.
 
-    Cor::Matrix{<:Real}
+    Cor::Symmetric{Float64, Matrix{Float64}}
 
     D::Matrix{<:Real} # full size
     fx::Vector{<:Real} # full size (all data points)
@@ -104,7 +104,7 @@ mutable struct MixComponentNormal <: MixComponentGPMTD
 end
 function MixComponentNormal()
 
-    Cor = Matrix(LinearAlgebra.Diagonal([1.0]))
+    Cor = Symmetric(Matrix(LinearAlgebra.Diagonal([1.0])))
     D = zeros(Float64, 1, 1)
     fx = zeros(Float64, 1)
     ζon_indx = ones(Int, 1)
@@ -149,8 +149,8 @@ function State_GPMTD(X::Matrix{T}, intercept::InterceptNormal,
     ## populate mixcomps
     for ℓ = 1:R
         mixcomps_out[ℓ].D = pairDistMat(X[:,[ℓ]])
-        mixcomps_out[ℓ].Cor = covMat(mixcomps_out[ℓ].D, mixcomps_out[ℓ].κ*mixcomps_out[ℓ].σ2, mixcomps_out[ℓ].corParams)
-        mixcomps_out[ℓ].fx = fill(1.0, n)
+        mixcomps_out[ℓ].Cor = corrMat(mixcomps_out[ℓ].D, mixcomps_out[ℓ].corParams)
+        mixcomps_out[ℓ].fx = fill(0.0, n)
         mixcomps_out[ℓ].ζon_indx = Vector{Int}(undef, 0)
 
         mixcomps_out[ℓ].rng = deepcopy(mixcomps_out[1].rng)
@@ -216,11 +216,11 @@ mutable struct PriorCovHyper_Matern <: PriorCovHyper
     lenscale0::GammaParams
 end
 function PriorCovHyper_Matern()
-    κ_ν = [2.5, 3.5, 5.0, 7.5, 10.0]
-    κ0 = GammaParams(3.5*2.0, 2.0)
+    κ_ν = [5.0, 7.5, 10.0, 25.0, 50.0]
+    κ0 = GammaParams(7.0/5.0*2.0, 2.0)
 
-    lenscale_ν = [2.5, 3.5, 5.0, 7.5, 10.0]
-    lenscale0 = GammaParams(1.5*2.0, 2.0)
+    lenscale_ν = [5.0, 7.5, 10.0, 25.0, 50.0]
+    lenscale0 = GammaParams(0.6*2.0, 2.0)
 
     return PriorCovHyper_Matern(κ_ν, κ0, lenscale_ν, lenscale0)
 end
@@ -270,5 +270,6 @@ function Model_GPMTD(y::Vector{T}, X::Matrix{T}, prior::Prior_GPMTD,
 
     D = [ pairDistMat(X[:,[ℓ]]) for ℓ = 1:R ]
 
-    return Model_GPMTD(y, X, prior, state, n, R, D)
+    return Model_GPMTD(deepcopy(y), deepcopy(X), deepcopy(prior),
+        deepcopy(state), n, R, D)
 end

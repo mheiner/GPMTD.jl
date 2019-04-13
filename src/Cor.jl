@@ -22,7 +22,7 @@ mutable struct MaternHyper_ScInvChiSq <: CorHypers
     lenscale0::Real
 end
 function MaternHyper_ScInvChiSq()
-    MaternHyper_ScInvChiSq(2.5, 1.5)
+    MaternHyper_ScInvChiSq(5.0, 0.6)
 end
 
 function corr(d::T, params::MaternParams; logout::Bool=false) where T <: Real
@@ -87,11 +87,11 @@ function corrMat(D::Matrix{T}, params::MaternParams; logout::Bool=false) where T
 
     end
 
-    return C
+    return Symmetric(C)
 end
 
 function covMat(D::Matrix{T}, variance::T, params::MaternParams; tol::Float64=1.0e-6) where T <: Real
-    variance > 0.0 || throw("Variance must be positive.")
+    variance > 0.0 || throw("Variance must be positive. Its value is $(variance).")
     lv = log(variance)
 
     if issymmetric(D)

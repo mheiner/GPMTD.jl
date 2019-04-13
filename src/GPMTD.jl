@@ -10,6 +10,7 @@ using Distributed
 using Dates
 # import StatsBase: counts, sample, Weights
 using StatsBase
+using SpecialFunctions
 
 ## personal packages
 using SparseProbVec

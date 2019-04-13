@@ -117,6 +117,7 @@ function mcmc!(model::Model_GPMTD, n_keep::Int;
             model.state.iter += 1
             if model.state.iter % report_freq == 0
                 write(report_file, "Iter $(model.state.iter) at $(Dates.now())\n")
+                model.state.llik = llik(model)
                 write(report_file, "Log-likelihood $(model.state.llik)\n")
                 write(report_file, "Current Metropolis acceptance rates: $(float((model.state.accpt - prev_accpt) / report_freq))\n\n")
                 prev_accpt = deepcopy(model.state.accpt)
@@ -128,13 +129,17 @@ function mcmc!(model::Model_GPMTD, n_keep::Int;
             for field in monitor_outer
                 sims[i][field] = deepcopy(getfield(model.state, field))
             end
-            for field in monitor_mixcomps
-                sims[i][:mixcomps] = [ deepcopy(getfield(model.state.mixcomps[j], field)) for j = 1:model.R ]
+            for j = 1:model.R
+                for field in monitor_mixcomps
+                    sims[i][:mixcomps][j][field] = deepcopy(getfield(model.state.mixcomps[j], field))
+                end
             end
             sims[i][:llik] = llik(model)
         end
 
     end
+
+    model.state.llik = llik(model)
 
     close(report_file)
 
@@ -246,14 +251,14 @@ function adapt!(model::Model_GPMTD;
 
                         fails[j] = true
 
-                        tmp = Matrix(model.state.mixcomps.cSig[j])
+                        tmp = Matrix(model.state.mixcomps[j].cSig)
                         σ = sqrt.(LinearAlgebra.diag(tmp))
                         ρ = StatsBase.cov2cor(tmp, σ)
 
                         σ[k] *= adjust_from_accptr(accptr[j], localtarget, adjust_bnds)
                         tmp = StatsBase.cor2cov(ρ, σ)
                         tmp += Diagonal(fill(0.1*minimum(σ), size(tmp,1)))
-                        model.state.mixcomps.cSig[j] = PDMat_adj(tmp)
+                        model.state.mixcomps[j].cSig = PDMat_adj(tmp)
 
                     else
                         fails[j] = false
@@ -292,10 +297,10 @@ function adapt!(model::Model_GPMTD;
     close(report_file)
 
     model.state.adapt = false
-    reset_adapt!(model)
+    # reset_adapt!(model)
     tries = 0
 
-    fails = trues(model.H)
+    fails = trues(model.R)
 
     while any(fails)
         tries += 1
@@ -342,6 +347,7 @@ function reset_adapt!(model::Model_GPMTD, nparams::Int=2)
     model.state.adapt_iter = 0
     R = length(model.state.mixcomps)
     for j = 1:R
+        model.state.mixcomps[j].adapt_iter = 0
         model.state.mixcomps[j].runningsum_Met = zeros( Float64, nparams )
         model.state.mixcomps[j].runningSS_Met = zeros( Float64, nparams, nparams )
     end

@@ -1,6 +1,6 @@
 # Update_mixcomps.jl
 
-function update_μ_σ2!(mixcomp::MixComponentNormal, suffstat::Dict{Any},
+function update_μ_σ2!(mixcomp::MixComponentNormal, suffstat::Dict{Symbol, T},
     prior::PriorMixcomponent_Normal) where T <: Real
 
     ## mean
@@ -20,13 +20,13 @@ function update_μ_σ2!(mixcomp::MixComponentNormal, suffstat::Dict{Any},
     return nothing
 end
 
-function rpost_f(y::Vector{T}, μ::T, σ2::T, κ::T, Cor::Matrix{T},
+function rpost_f(y::Vector{T}, μ::T, σ2::T, κ::T, Cor::Symmetric{Float64, Matrix{Float64}},
     rng::Union{MersenneTwister, Threefry4x}) where T <: Real
     # conjugate update for MvNormal mean with prior mean μ, known general
     #   correlation matrix Cor, signal-to-noise ratio κ, and indep. noisy obs with variance σ2.
 
     Corinv = inv(Cor)
-    J = (Corinv ./ κ + I) ./ σ2
+    J = PDMat_adj((Corinv ./ κ + I) ./ σ2)
 
     h = ( y .- μ ) ./ σ2
 
@@ -54,7 +54,7 @@ function rfullcond_fstar(f_ell::T, Celel::T,
     ## here C is the **Covariance** matrix
 
     μ = Cstel .* f_ell ./ Celel
-    Σ = Cstst - Cstel * Cstel' ./ Celel
+    Σ = Symmetric(Cstst - Cstel * Cstel' ./ Celel)
 
     return rand(rng, Distributions.MvNormal( μ, Σ ) )
 end
@@ -80,7 +80,7 @@ function rfullcond_fstar(f_ell::Vector{T}, Celel::Matrix{T},
     ## here C is the **Covariance** matrix
 
     μ = Cstel * ( Celel \ f_ell )
-    Σ = Cstst - Cstel * ( Celel \ Cstel' )
+    Σ = Symmetric(Cstst - Cstel * ( Celel \ Cstel' ))
 
     return rand(rng, Distributions.MvNormal( μ, Σ ) )
 end
@@ -88,13 +88,16 @@ end
 
 ### worker function that operates on its own
 function update_mixcomp!(mixcomp::MixComponentNormal, prior::PriorMixcomponent_Normal,
-    y::Vector{T}, update::Vector{Symbol}=[:μ, :σ2,
-        :κ, :corParams, :fx]) where T <: Real
+    y::Vector{T}, update::Vector{Symbol}=[:μ, :σ2, :κ, :corParams, :fx]) where T <: Real
 
     nζ = length(mixcomp.ζon_indx)
 
     if (:κ in update) || (:corParams in update)
-        suffstat = update_Cov!(mixcomp, y, SNR_Hyper_ScInvChiSq(), MaternHyper_ScInvChiSq())
+        suffstat = update_Cov!(mixcomp, y, prior, SNR_Hyper_ScInvChiSq(), MaternHyper_ScInvChiSq())
+    elseif nζ > 0
+        W_now, sumWinv_now = getW(mixcomp.κ, mixcomp.D[mixcomp.ζon_indx, mixcomp.ζon_indx], mixcomp.corParams)
+        yhat_now, s2_now = getSufficients_W(y[mixcomp.ζon_indx], W_now, sumWinv_now)
+        suffstat = Dict(:sumWinv => sumWinv_now, :yhat => yhat_now, :s2 => s2_now)
     end
 
     if nζ > 0
@@ -105,7 +108,7 @@ function update_mixcomp!(mixcomp::MixComponentNormal, prior::PriorMixcomponent_N
 
         if (:fx in update)
             mixcomp.fx[mixcomp.ζon_indx] = rpost_f(y[mixcomp.ζon_indx], mixcomp.μ, mixcomp.σ2,
-                mixcomp.κ, mixcomp.Cor, mixcomp.rng)
+                mixcomp.κ, Symmetric(mixcomp.Cor[mixcomp.ζon_indx, mixcomp.ζon_indx]), mixcomp.rng)
 
             ζoff_indx = setdiff( 1:length(y) , mixcomp.ζon_indx )
             Cov = PDMat_adj(mixcomp.Cor .* (mixcomp.κ * mixcomp.σ2))
@@ -139,13 +142,14 @@ function update_mixcomps!(state::State_GPMTD, prior::Prior_GPMTD, y::Vector{T},
     R = length(state.mixcomps)
 
     for ℓ = 1:R
-        state.mixcomp[ℓ].adapt = state.adapt
+        state.mixcomps[ℓ].adapt = state.adapt
     end
 
     state.mixcomps = pmap(update_mixcomp!, state.mixcomps, prior.mixcomps,
         fill(y, R), fill(update, R)) # pmap will update in place on each worker, but we also need to return the mixcomps
 
-    state.accpt = [ deepcopy(state.mixcomp[ℓ].accpt) for ℓ = 1:R ]
+    state.accpt = [ deepcopy(state.mixcomps[ℓ].accpt) for ℓ = 1:R ]
+    state.adapt_iter = deepcopy(state.mixcomps[1].adapt_iter)
 
     return nothing
 end

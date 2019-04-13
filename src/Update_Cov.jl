@@ -11,7 +11,7 @@ end
 function getSufficients_W(y::Vector{T}, W::PDMat, sumWinv::T,
     mixcomp_type::MixComponentNormal=MixComponentNormal()) where T <: Real
 
-    yhat = sum(y) / sumWinv
+    yhat = sum(W \ y) / sumWinv
     d = y .- yhat
     Winvd = W \ d
     s2 = d'Winvd
@@ -48,6 +48,7 @@ function lprior_κCor(lκ::T, lcorParam::T, κHypers::SNR_Hyper_ScInvChiSq,
 end
 
 function update_Cov!(mixcomp::MixComponentNormal, y::Vector{T}, # assumes y is full
+    priorMixcomponent::PriorMixcomponent_Normal,
     κHypers_type::SNR_Hyper_ScInvChiSq, corParamHypers_type::MaternHyper_ScInvChiSq) where T <: Real
 
     nζon = length(mixcomp.ζon_indx)
@@ -109,7 +110,7 @@ function update_Cov!(mixcomp::MixComponentNormal, y::Vector{T}, # assumes y is f
             mixcomp.accpt += 1
 
             lparams_out = deepcopy(cand)
-            out = Dict(:sumWinv => sumWinv_cand, :yhat => yhat_cand, :s2 => s2_cand)
+            out = Dict()
         else
             lparams_out = vcat(deepcopy(lκ_old), deepcopy(lcorParam_old))
             out = Dict()

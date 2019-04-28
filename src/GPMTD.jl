@@ -28,5 +28,6 @@ include("Update_CovHypers.jl")
 include("Lik.jl")
 include("Sim.jl")
 include("mcmc.jl")
+include("DensityEstimation.jl")
 
 end # module

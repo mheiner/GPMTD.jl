@@ -60,6 +60,7 @@ end
 function mcmc!(model::Model_GPMTD, n_keep::Int;
     save::Bool=true,
     thin::Int=1,
+    n_procs::Int=1,
     report_filename::String="out_progress.txt",
     report_freq::Int=10000,
     update::Vector{Symbol}=[:intercept, :lλ, :ζ, :μ, :σ2,
@@ -103,7 +104,7 @@ function mcmc!(model::Model_GPMTD, n_keep::Int;
             end
 
             if up_mixcomps
-                update_mixcomps!(model.state, model.prior, model.y, update_mixcomps)
+                update_mixcomps!(model.state, model.prior, model.y, update_mixcomps, n_procs=n_procs)
             end
 
             if (:lλ in update_outer)
@@ -206,7 +207,7 @@ function adapt!(model::Model_GPMTD;
         for j = 1:model.R
             fails[j] = (accptr[j] < accptr_bnds[1])
             if fails[j]
-                model.state.mixcomps[j].cSig *= adjust_from_accptr(accptr[j], target, adjust_bnds)
+                model.state.mixcomps[j].cSig = PDMat_adj(adjust_from_accptr(accptr[j], target, adjust_bnds) * model.state.mixcomps[j].cSig.mat)
             end
         end
 
@@ -297,7 +298,7 @@ function adapt!(model::Model_GPMTD;
     close(report_file)
 
     model.state.adapt = false
-    # reset_adapt!(model)
+    reset_adapt!(model)
     tries = 0
 
     fails = trues(model.R)
@@ -322,7 +323,7 @@ function adapt!(model::Model_GPMTD;
 
             if too_low || too_high
                 fails[j] = true
-                model.state.mixcomps[j].cSig *= adjust_from_accptr(accptr[j], target, adjust_bnds)
+                model.state.mixcomps[j].cSig = PDMat_adj(adjust_from_accptr(accptr[j], target, adjust_bnds) * model.state.mixcomps[j].cSig.mat)
             else
                 fails[j] = false
             end

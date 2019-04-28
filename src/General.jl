@@ -35,28 +35,28 @@ end
 
 
 mutable struct NormalParams
-    μ::Real
-    σ2::Real
+    μ::Float64
+    σ2::Float64
     NormalParams(μ, σ2) = σ2 > 0.0 ? new(μ, σ2) : error("σ2 must be positive.")
 end
 
 mutable struct ScInvChiSqParams
-    ν::Real
-    s0::Real
+    ν::Float64
+    s0::Float64
     ScInvChiSqParams(ν, s0) = ν > 0.0 && s0 > 0.0 ? new(ν, s0) : error("Both parameters must be positive.")
 end
 
 mutable struct GammaParams
-    shape::Real
-    rate::Real
+    shape::Float64
+    rate::Float64
     GammaParams(shape, rate) = shape > 0.0 && rate > 0.0 ? new(shape, rate) : error("Both parameters must be positive.")
 end
 
 abstract type InterceptGPMTD end
 
 mutable struct InterceptNormal <: InterceptGPMTD
-    μ::Real
-    σ2::Real
+    μ::Float64
+    σ2::Float64
     InterceptNormal(μ, σ2) = σ2 > 0.0 ? new(μ, σ2) : error("σ2 must be positive.")
 end
 function InterceptNormal()
@@ -66,8 +66,8 @@ end
 abstract type SNR_Hyper end
 
 mutable struct SNR_Hyper_ScInvChiSq <: SNR_Hyper
-    κ_ν::Real
-    κ0::Real
+    κ_ν::Float64
+    κ0::Float64
     SNR_Hyper_ScInvChiSq(κ_ν, κ0) = κ_ν > 0.0 && κ0 > 0.0 ? new(κ_ν, κ0) : error("Both parameters must be positive.")
 end
 function SNR_Hyper_ScInvChiSq()
@@ -77,10 +77,10 @@ end
 abstract type MixComponentGPMTD end
 
 mutable struct MixComponentNormal <: MixComponentGPMTD
-    μ::Real
-    σ2::Real
+    μ::Float64
+    σ2::Float64
 
-    κ::Real # signal to noise ratio parameter
+    κ::Float64 # signal to noise ratio parameter
     κ_hypers::SNR_Hyper # this is updated elsewhere, but dragged along for each mixcomp.
 
     corParams::CorParams
@@ -88,16 +88,16 @@ mutable struct MixComponentNormal <: MixComponentGPMTD
 
     Cor::Symmetric{Float64, Matrix{Float64}}
 
-    D::Matrix{<:Real} # full size
-    fx::Vector{<:Real} # full size (all data points)
+    D::Matrix{Float64} # full size
+    fx::Vector{Float64} # full size (all data points)
 
     ζon_indx::Vector{Int} # which y, x belong to this mixture component
 
     ## for MCMC
     rng::Union{MersenneTwister, Threefry4x}
     cSig::PDMat
-    runningsum_Met::Union{Array{<:Real, 1}, Nothing}
-    runningSS_Met::Union{Array{<:Real, 2}, Nothing}
+    runningsum_Met::Union{Array{Float64, 1}, Nothing}
+    runningSS_Met::Union{Array{Float64, 2}, Nothing}
     accpt::Int
     adapt::Bool
     adapt_iter::Int
@@ -121,9 +121,9 @@ mutable struct State_GPMTD
 
     ## parameters
     intercept::InterceptGPMTD
-    mixcomps::Vector{<:MixComponentGPMTD}
+    mixcomps::Vector{MixComponentGPMTD}
 
-    lλ::Vector{<:Real}
+    lλ::Vector{Float64}
     ζ::Vector{Int}
 
     ## others
@@ -133,7 +133,7 @@ mutable struct State_GPMTD
     adapt::Bool
     adapt_iter::Union{Int, Nothing}
 
-    llik::Real
+    llik::Float64
 
 end
 
@@ -181,7 +181,7 @@ function PriorIntercept_Normal()
     prior_μ = NormalParams(μ_μ, μ_σ2)
 
     σ2_ν = 5.0
-    σ2_s0 = 1.0
+    σ2_s0 = 100.0
     prior_σ2 = ScInvChiSqParams(σ2_ν, σ2_s0)
 
     return PriorIntercept_Normal( prior_μ, prior_σ2 )
@@ -209,25 +209,25 @@ end
 abstract type PriorCovHyper end
 
 mutable struct PriorCovHyper_Matern <: PriorCovHyper
-    κ_ν::Vector{<:Real}
+    κ_ν::Vector{Float64}
     κ0::GammaParams
 
-    lenscale_ν::Vector{<:Real}
+    lenscale_ν::Vector{Float64}
     lenscale0::GammaParams
 end
 function PriorCovHyper_Matern()
     κ_ν = [5.0, 7.5, 10.0, 25.0, 50.0]
-    κ0 = GammaParams(7.0/5.0*2.0, 2.0)
+    κ0 = GammaParams(100.0*0.1, 0.1)
 
     lenscale_ν = [5.0, 7.5, 10.0, 25.0, 50.0]
-    lenscale0 = GammaParams(0.6*2.0, 2.0)
+    lenscale0 = GammaParams(10.0*1.0, 1.0)
 
     return PriorCovHyper_Matern(κ_ν, κ0, lenscale_ν, lenscale0)
 end
 
 mutable struct Prior_GPMTD
     intercept::PriorIntercept
-    mixcomps::Vector{<:PriorMixcomponent}
+    mixcomps::Vector{PriorMixcomponent}
     covhyper::PriorCovHyper
     λ::Union{SparseDirMix, SBMprior, Vector{Float64}}
 end
@@ -247,15 +247,15 @@ end
 mutable struct Model_GPMTD
 
     ## Provided
-    y::Vector{<:Real}
-    X::Matrix{<:Real}
+    y::Vector{Float64}
+    X::Matrix{Float64}
     prior::Prior_GPMTD
     state::State_GPMTD
 
     ## Calculated
     n::Int # length of data
     R::Int # number of lags considered
-    D::Vector{Matrix{<:Real}} # Distance matrix for each column of X
+    D::Vector{Matrix{Float64}} # Distance matrix for each column of X
 
 end
 

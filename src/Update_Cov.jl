@@ -27,7 +27,7 @@ function lmarg_W(W::PDMat, sumWinv::T, yhat::T, s2::T, σ2::T,
     a3 = log(sumWinv)
     a40 = σ2 / sumWinv + priorMixcomponent.μ.σ2
     a4 = log(a40)
-    a5 = yhat^2 / a40
+    a5 = (yhat - priorMixcomponent.μ.μ)^2 / a40
 
     return -0.5*( a1 + a2 + a3 + a4 + a5 )
 end

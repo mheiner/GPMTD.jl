@@ -4,7 +4,8 @@ export getEyPy;
 
 
 function getEyPy(sims::Array, X_grid::Matrix{T},
-    X::Matrix{T}, D::Vector{Matrix{T}}; densout::Bool=false, y_grid::Vector{T}=[0.0]) where T <: Real
+    X::Matrix{T}, D::Vector{Matrix{T}}; densout::Bool=false, y_grid::Vector{T}=[0.0],
+    rng::MersenneTwister=MersenneTwister()) where T <: Real
 
     n_star, R = size(X_grid)
     n_y = length(y_grid)
@@ -23,7 +24,7 @@ function getEyPy(sims::Array, X_grid::Matrix{T},
         covMat(D[j], sims[ii][:mixcomps][j][:κ]*sims[ii][:mixcomps][j][:σ2], sims[ii][:mixcomps][j][:corParams]),
         covMat(Dstar[j], sims[ii][:mixcomps][j][:κ]*sims[ii][:mixcomps][j][:σ2], sims[ii][:mixcomps][j][:corParams]),
         covMat(Dstdat[j], sims[ii][:mixcomps][j][:κ]*sims[ii][:mixcomps][j][:σ2], sims[ii][:mixcomps][j][:corParams]),
-        model.state.mixcomps[j].rng) for ii = 1:nsim ]...)
+        rng) for ii = 1:nsim ]...)
     end
 
     Ey = Matrix{Float64}(undef, n_star, nsim)

@@ -34,9 +34,9 @@ end
 
 function update_cov_hypers!(state::State_GPMTD, prior::PriorCovHyper_Matern) where T <: Real
 
-    R = length(state.mixcomps)
+    L = length(state.mixcomps)
 
-    nζ = StatsBase.counts(state.ζ, 1:R) # intercept does not involve these parameters
+    nζ = StatsBase.counts(state.ζ, 1:L) # intercept does not involve these parameters
     use_indx = findall( nζ .> 0 )
 
     if length(use_indx) > 0
@@ -61,7 +61,7 @@ function update_cov_hypers!(state::State_GPMTD, prior::PriorCovHyper_Matern) whe
     end
 
     # update these parameters in all mixcomps
-    for ℓ = 1:R
+    for ℓ = 1:L
         state.mixcomps[ℓ].κ_hypers.κ_ν = κ_ν_out
         state.mixcomps[ℓ].κ_hypers.κ0 = κ0_out
         state.mixcomps[ℓ].corHypers.lenscale_ν = lenscale_ν_out

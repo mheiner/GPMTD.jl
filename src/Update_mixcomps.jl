@@ -199,22 +199,22 @@ function update_mixcomps!(state::State_GPMTD, prior::Prior_GPMTD, y::Vector{T},
     update::Vector{Symbol}=[:μ, :σ2, :κ, :corParams, :fx];
     n_procs::Int=1) where T <: Real
 
-    R = length(state.mixcomps)
+    L = length(state.mixcomps)
 
-    for ℓ = 1:R
+    for ℓ = 1:L
         state.mixcomps[ℓ].adapt = state.adapt
     end
 
     if n_procs == 1
-        for ℓ = 1:R
+        for ℓ = 1:L
             state.mixcomps[ℓ] = update_mixcomp!(state.mixcomps[ℓ], prior.mixcomps[ℓ], y, update)
         end
     elseif n_procs > 1
         state.mixcomps = pmap(update_mixcomp!, state.mixcomps, prior.mixcomps,
-            fill(y, R), fill(update, R)) # pmap will update in place on each worker, but we also need to return the mixcomps
+            fill(y, L), fill(update, L)) # pmap will update in place on each worker, but we also need to return the mixcomps
     end
 
-    state.accpt = [ deepcopy(state.mixcomps[ℓ].accpt) for ℓ = 1:R ]
+    state.accpt = [ deepcopy(state.mixcomps[ℓ].accpt) for ℓ = 1:L ]
     state.adapt_iter = deepcopy(state.mixcomps[1].adapt_iter)
 
     return nothing

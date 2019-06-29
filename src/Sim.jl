@@ -6,16 +6,16 @@ function simGPMTD!(n::Int, nburn::Int, intercept::InterceptNormal,
     mixcomps::Vector{MixComponentNormal},
     λ::Vector{T}) where T <: Real
 
-    R = length(mixcomps)
-    y = zeros(Float64, n + nburn + R)
-    ζvec = zeros(Int, n + nburn + R)
-    y[1:R] = sqrt(intercept.σ2 / 100.0) .* randn(R)
-    xx = [ Matrix{Float64}(undef, 0, 1) for ℓ = 1:R ]
-    nζ = zeros(Int, R+1)
+    L = length(mixcomps)
+    y = zeros(Float64, n + nburn + L)
+    ζvec = zeros(Int, n + nburn + L)
+    y[1:L] = sqrt(intercept.σ2 / 100.0) .* randn(L)
+    xx = [ Matrix{Float64}(undef, 0, 1) for ℓ = 1:L ]
+    nζ = zeros(Int, L+1)
 
-    for t = (R + 1):(R + nburn + n)
+    for t = (L + 1):(L + nburn + n)
 
-        ζ = StatsBase.sample(0:R, Weights(λ))
+        ζ = StatsBase.sample(0:L, Weights(λ))
 
         if ζ == 0
 
@@ -52,9 +52,9 @@ function simGPMTD!(n::Int, nburn::Int, intercept::InterceptNormal,
         end
     end
 
-    yout = y[(R + nburn + 1):(R + nburn + n)]
-    ζout = ζvec[(R + nburn + 1):(R + nburn + n)]
-    fx = [ deepcopy(mixcomps[ℓ].fx) for ℓ = 1:R ]
+    yout = y[(L + nburn + 1):(L + nburn + n)]
+    ζout = ζvec[(L + nburn + 1):(L + nburn + n)]
+    fx = [ deepcopy(mixcomps[ℓ].fx) for ℓ = 1:L ]
 
     return (yout, xx, fx, ζout)
 end
@@ -63,25 +63,25 @@ function simGPMTD_full!(n::Int, nburn::Int, intercept::InterceptNormal,
     mixcomps::Vector{MixComponentNormal},
     λ::Vector{T}) where T <: Real
 
-    R = length(mixcomps)
-    y = zeros(Float64, n + nburn + R)
-    X = zeros(Float64, n + nburn, R)
-    ζvec = zeros(Int, n + nburn + R)
-    y[1:R] = sqrt(intercept.σ2 / 100.0) .* randn(R)
+    L = length(mixcomps)
+    y = zeros(Float64, n + nburn + L)
+    X = zeros(Float64, n + nburn, L)
+    ζvec = zeros(Int, n + nburn + L)
+    y[1:L] = sqrt(intercept.σ2 / 100.0) .* randn(L)
 
-    for ℓ = 1:R
+    for ℓ = 1:L
         mixcomps[ℓ].fx[1] = sqrt(mixcomps[ℓ].κ * mixcomps[ℓ].σ2) * randn()
-        X[1,ℓ] = deepcopy( y[R+1-ℓ] )
+        X[1,ℓ] = deepcopy( y[L+1-ℓ] )
     end
 
-    ζ = StatsBase.sample(0:R, Weights(λ))
-    y[R+1] = sqrt(mixcomps[ζ].σ2)*randn() + mixcomps[ζ].μ + mixcomps[ζ].fx[1]
-    ζvec[R+1] = deepcopy(ζ)
+    ζ = StatsBase.sample(0:L, Weights(λ))
+    y[L+1] = sqrt(mixcomps[ζ].σ2)*randn() + mixcomps[ζ].μ + mixcomps[ζ].fx[1]
+    ζvec[L+1] = deepcopy(ζ)
 
-    for t = (R + 2):(R + nburn + n)
-        ii = t - R
+    for t = (L + 2):(L + nburn + n)
+        ii = t - L
 
-        for ℓ = 1:R
+        for ℓ = 1:L
             X[ii,ℓ] = deepcopy( y[t-ℓ] )
             mixcomps[ℓ].D = expanD(mixcomps[ℓ].D, X[ii,ℓ], X[(ii-1):-1:1,[ℓ]])
             mixcomps[ℓ].Cor = corrMat(mixcomps[ℓ].D, mixcomps[ℓ].corParams)
@@ -93,7 +93,7 @@ function simGPMTD_full!(n::Int, nburn::Int, intercept::InterceptNormal,
             pushfirst!(mixcomps[ℓ].fx, f)
         end
 
-        ζ = StatsBase.sample(0:R, Weights(λ))
+        ζ = StatsBase.sample(0:L, Weights(λ))
         ζvec[t] = deepcopy(ζ)
 
         if ζ == 0
@@ -104,12 +104,12 @@ function simGPMTD_full!(n::Int, nburn::Int, intercept::InterceptNormal,
 
     end
 
-    for ℓ = 1:R
+    for ℓ = 1:L
         mixcomps[ℓ].fx = deepcopy(reverse(mixcomps[ℓ].fx)[(nburn+1):(nburn+n)])
     end
 
-    yout = y[(R + nburn + 1):(R + nburn + n)]
-    ζout = ζvec[(R + nburn + 1):(R + nburn + n)]
+    yout = y[(L + nburn + 1):(L + nburn + n)]
+    ζout = ζvec[(L + nburn + 1):(L + nburn + n)]
     Xout = X[(nburn+1):(nburn+n),:]
 
     return (yout, Xout, ζout)

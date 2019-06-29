@@ -1,7 +1,7 @@
 name = "GPMTD"
 uuid = "27bf47ac-5281-11e9-10d0-cd1f62eacece"
 authors = ["Matt Heiner <mheiner@ucsc.edu>"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 BayesInference = "674fc506-cd11-11e8-249e-83dc12bc047a"

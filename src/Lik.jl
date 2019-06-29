@@ -31,14 +31,14 @@ end
 function llik(model::Model_GPMTD)
 
     llik = 0.0
-    lp = Vector{Float64}(undef, model.R+1)
+    lp = Vector{Float64}(undef, model.L+1)
 
     for i = 1:model.n
 
         lp[1] = model.state.lλ[1] - 0.5*log(2π*model.state.intercept.σ2) -
             0.5 * (model.y[i] - model.state.intercept.μ)^2 / model.state.intercept.σ2
 
-        for j in 1:model.R
+        for j in 1:model.L
             lp[j+1] = model.state.lλ[j+1] -
             0.5*log(2π*model.state.mixcomps[j].σ2) -
                 0.5 * (model.y[i] - model.state.mixcomps[j].μ - model.state.mixcomps[j].fx[i])^2 / model.state.mixcomps[j].σ2

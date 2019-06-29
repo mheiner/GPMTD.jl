@@ -141,13 +141,13 @@ end
 function State_GPMTD(X::Matrix{T}, intercept::InterceptNormal,
     mixcomps::MixComponentNormal) where T <: Real
 
-    n, R = size(X)
+    n, L = size(X)
 
-    mixcomps_out = [ deepcopy(mixcomps) for ℓ = 1:R ]
+    mixcomps_out = [ deepcopy(mixcomps) for ℓ = 1:L ]
     mixcomps_out[1].rng = Random123.Threefry4x( tuple(rand(Int, 4)...) ) # parallel-safe generator
 
     ## populate mixcomps
-    for ℓ = 1:R
+    for ℓ = 1:L
         mixcomps_out[ℓ].D = pairDistMat(X[:,[ℓ]])
         mixcomps_out[ℓ].Cor = corrMat(mixcomps_out[ℓ].D, mixcomps_out[ℓ].corParams)
         mixcomps_out[ℓ].fx = fill(0.0, n)
@@ -161,10 +161,10 @@ function State_GPMTD(X::Matrix{T}, intercept::InterceptNormal,
         mixcomps_out[ℓ].runningSS_Met = zeros(Float64, 2, 2)
     end
 
-    lλ = fill( log(1.0/(R+1.0)), R + 1 )
+    lλ = fill( log(1.0/(L+1.0)), L + 1 )
     ζ = zeros(Int, n)
 
-    return State_GPMTD(intercept, mixcomps_out, lλ, ζ, 0, zeros(Int, R), false, 0, 0.0)
+    return State_GPMTD(intercept, mixcomps_out, lλ, ζ, 0, zeros(Int, L), false, 0, 0.0)
 end
 ## if you want to do another constructor with random inits, create another function with the prior
 
@@ -233,13 +233,13 @@ mutable struct Prior_GPMTD
 end
 
 ## Default prior constructor
-function Prior_GPMTD(R::Int, intercept::InterceptNormal,
+function Prior_GPMTD(L::Int, intercept::InterceptNormal,
     mixcomps::MixComponentNormal)
 
     intcpt_prior = PriorIntercept_Normal()
-    mixcomps_prior = [ PriorMixcomponent_Normal() for ℓ = 1:R ]
+    mixcomps_prior = [ PriorMixcomponent_Normal() for ℓ = 1:L ]
     covhyper_prior = PriorCovHyper_Matern()
-    λ_prior = SparseProbVec.SBMprior(R+1, 1.0e3, 0.5, 0.25, 1.0, 1.0)
+    λ_prior = SparseProbVec.SBMprior(L+1, 1.0e3, 0.5, 0.25, 1.0, 1.0)
 
     Prior_GPMTD(intcpt_prior, mixcomps_prior, covhyper_prior, λ_prior)
 end
@@ -254,7 +254,7 @@ mutable struct Model_GPMTD
 
     ## Calculated
     n::Int # length of data
-    R::Int # number of lags considered
+    L::Int # number of lags considered
     D::Vector{Matrix{Float64}} # Distance matrix for each column of X
 
 end
@@ -264,12 +264,12 @@ function Model_GPMTD(y::Vector{T}, X::Matrix{T}, prior::Prior_GPMTD,
     state::State_GPMTD) where T <: Real
 
     n = length(y)
-    nx, R = size(X)
+    nx, L = size(X)
 
     n == nx || throw("Lengths of X and y differ.")
 
-    D = [ pairDistMat(X[:,[ℓ]]) for ℓ = 1:R ]
+    D = [ pairDistMat(X[:,[ℓ]]) for ℓ = 1:L ]
 
     return Model_GPMTD(deepcopy(y), deepcopy(X), deepcopy(prior),
-        deepcopy(state), n, R, D)
+        deepcopy(state), n, L, D)
 end

@@ -17,13 +17,13 @@ function postSimsInit(n_keep::Int, init_state::Union{State_GPMTD},
     monitor::Vector{Symbol}=[:intercept, :lλ, :μ, :σ2, :κ,
         :κ_hypers, :corParams, :corHypers, :fx])
 
-    R = length(init_state.mixcomps)
+    L = length(init_state.mixcomps)
 
     monitor_outer = intersect(monitor, fieldnames(typeof(init_state)))
     monitor_mixcomps = intersect(monitor, fieldnames(typeof(init_state.mixcomps[1])))
 
     state = deepcopyFields(init_state, monitor_outer)
-    state[:mixcomps] = [ deepcopyFields(init_state.mixcomps[j], monitor_mixcomps) for j = 1:R ]
+    state[:mixcomps] = [ deepcopyFields(init_state.mixcomps[j], monitor_mixcomps) for j = 1:L ]
 
     state[:llik] = 0.0
 
@@ -130,7 +130,7 @@ function mcmc!(model::Model_GPMTD, n_keep::Int;
             for field in monitor_outer
                 sims[i][field] = deepcopy(getfield(model.state, field))
             end
-            for j = 1:model.R
+            for j = 1:model.L
                 for field in monitor_mixcomps
                     sims[i][:mixcomps][j][field] = deepcopy(getfield(model.state.mixcomps[j], field))
                 end
@@ -188,7 +188,7 @@ function adapt!(model::Model_GPMTD;
     reset_adapt!(model)
     tries = 0
 
-    fails = trues(model.R)
+    fails = trues(model.L)
 
     while any(fails)
         tries += 1
@@ -204,7 +204,7 @@ function adapt!(model::Model_GPMTD;
             report_filename=report_filename,
             report_freq=n_iter_scale, update=update)
 
-        for j = 1:model.R
+        for j = 1:model.L
             fails[j] = (accptr[j] < accptr_bnds[1])
             if fails[j]
                 model.state.mixcomps[j].cSig = PDMat_adj(adjust_from_accptr(accptr[j], target, adjust_bnds) * model.state.mixcomps[j].cSig.mat)
@@ -229,7 +229,7 @@ function adapt!(model::Model_GPMTD;
         for k = 1:d
 
             tries = 0
-            fails = trues(model.R)
+            fails = trues(model.L)
             while any(fails)
                 tries += 1
                 if tries > maxtries
@@ -244,7 +244,7 @@ function adapt!(model::Model_GPMTD;
                     report_filename=report_filename,
                     report_freq=n_iter_scale, update=update)
 
-                for j = 1:model.R
+                for j = 1:model.L
                     too_low = accptr[j] < (accptr_bnds[1] * 0.5)
                     too_high = accptr[j] > (accptr_bnds[2])
 
@@ -285,7 +285,7 @@ function adapt!(model::Model_GPMTD;
         report_filename=report_filename,
         report_freq=1000, update=update)
 
-    for j = 1:model.R
+    for j = 1:model.L
         Sighat = model.state.mixcomps[j].runningSS_Met / float(model.state.adapt_iter)
         # minSighat = minimum(abs.(Sighat))
         # SighatPD = Sighat + Matrix(Diagonal(fill(0.1*minSighat, d)))
@@ -301,7 +301,7 @@ function adapt!(model::Model_GPMTD;
     reset_adapt!(model)
     tries = 0
 
-    fails = trues(model.R)
+    fails = trues(model.L)
 
     while any(fails)
         tries += 1
@@ -317,7 +317,7 @@ function adapt!(model::Model_GPMTD;
             report_filename=report_filename,
             report_freq=n_iter_scale, update=update)
 
-        for j = 1:model.R
+        for j = 1:model.L
             too_low = accptr[j] < accptr_bnds[1]
             too_high = accptr[j] > accptr_bnds[2]
 
@@ -346,8 +346,8 @@ end
 
 function reset_adapt!(model::Model_GPMTD, nparams::Int=2)
     model.state.adapt_iter = 0
-    R = length(model.state.mixcomps)
-    for j = 1:R
+    L = length(model.state.mixcomps)
+    for j = 1:L
         model.state.mixcomps[j].adapt_iter = 0
         model.state.mixcomps[j].runningsum_Met = zeros( Float64, nparams )
         model.state.mixcomps[j].runningSS_Met = zeros( Float64, nparams, nparams )

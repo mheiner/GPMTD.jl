@@ -2,7 +2,7 @@
 
 export CorParams, MaternParams,
     CorHypers, MaternHyper_ScInvChiSq,
-    corr, corMat, covMat, PDMat_adj;
+    corr, corrMat, covMat, PDMat_adj;
 
 abstract type CorParams end
 

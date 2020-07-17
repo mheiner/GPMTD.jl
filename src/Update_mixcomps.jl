@@ -186,7 +186,7 @@ function update_mixcomp!(mixcomp::MixComponentNormal, prior::PriorMixcomponent_N
 
         if (:fx in update)
             Cov = PDMat_adj(mixcomp.Cor .* (mixcomp.κ * mixcomp.σ2))
-            mixcomp.fx = rand(mixcomp.rng, Distributions.MvNormal( Cov ) )
+            mixcomp.fx = rand(mixcomp.rng, Distributions.MvNormal( Cov.mat ) )
         end
     end
 

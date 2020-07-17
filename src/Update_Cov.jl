@@ -64,7 +64,7 @@ function update_Cov!(mixcomp::MixComponentNormal, y::Vector{T}, # assumes y is f
         llik_old = lmarg_W(W_old, sumWinv_old, yhat_old, s2_old, mixcomp.σ2, priorMixcomponent)
         lpri_old = lprior_κCor(lκ_old, lcorParam_old, mixcomp.κ_hypers, mixcomp.corHypers)
 
-        cand = [ lκ_old, lcorParam_old ] + rand(mixcomp.rng, MvNormal(mixcomp.cSig))
+        cand = [ lκ_old, lcorParam_old ] + rand(mixcomp.rng, MvNormal(mixcomp.cSig.mat))
         κ_cand = exp(cand[1])
         corParams_cand = deepcopy(mixcomp.corParams)
         corParams_cand.lenscale = exp(cand[2])
@@ -94,7 +94,7 @@ function update_Cov!(mixcomp::MixComponentNormal, y::Vector{T}, # assumes y is f
 
         lpri_old = lprior_κCor(lκ_old, lcorParam_old, mixcomp.κ_hypers, mixcomp.corHypers)
 
-        cand = [ lκ_old, lcorParam_old ] + rand(mixcomp.rng, MvNormal(mixcomp.cSig))
+        cand = [ lκ_old, lcorParam_old ] + rand(mixcomp.rng, MvNormal(mixcomp.cSig.mat))
         κ_cand = exp(cand[1])
         corParams_cand = deepcopy(mixcomp.corParams)
         corParams_cand.lenscale = exp(cand[2])

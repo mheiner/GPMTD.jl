@@ -7,7 +7,7 @@ function llik_ScInvChiSq(y::Vector{T}, ν::T, s0::T) where T <: Real
 
     halfnu = 0.5 * ν
     a1 = halfnu * n * (log(ν) + log(s0) - log(2.0))
-    a2 = n * SpecialFunctions.lgamma(halfnu)
+    a2 = n * SpecialFunctions.loggamma(halfnu)
     a3 = halfnu * sumlogy
     a4 = halfnu * s0 * sum1divy
 

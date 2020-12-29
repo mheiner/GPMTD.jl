@@ -33,11 +33,11 @@ function postSimsInit(n_keep::Int, init_state::Union{State_GPMTD},
 end
 
 ## MCMC timing for benchmarks
-function timemod!(n::Int64, model::Union{Model_GPMTD}, niter::Int, outfilename::String)
+function timemod!(n::Int64, model::Union{Model_GPMTD}, niter::Int, outfilename::String; tol_posdef=1.0e-9)
     outfile = open(outfilename, "a+")
     write(outfile, "timing for $(niter) iterations each:\n")
     for i in 1:n
-        tinfo = @timed mcmc!(model, niter)
+        tinfo = @timed mcmc!(model, niter, tol_posdef=tol_posdef)
         write(outfile, "trial $(i), elapsed: $(tinfo[2]) seconds, allocation: $(tinfo[3]/1.0e6) Megabytes\n")
     end
     close(outfile)
@@ -66,7 +66,8 @@ function mcmc!(model::Model_GPMTD, n_keep::Int;
     update::Vector{Symbol}=[:intercept, :lλ, :ζ, :μ, :σ2,
         :κ, :κ_hypers, :corParams, :corHypers, :fx],
     monitor::Vector{Symbol}=[:intercept, :lλ, :μ, :σ2,
-        :κ, :κ_hypers, :corParams, :corHypers, :fx])
+        :κ, :κ_hypers, :corParams, :corHypers, :fx],
+    tol_posdef=1.0e-9)
 
     ## output files
     report_file = open(report_filename, "a+")
@@ -104,7 +105,7 @@ function mcmc!(model::Model_GPMTD, n_keep::Int;
             end
 
             if up_mixcomps
-                update_mixcomps!(model.state, model.prior, model.y, update_mixcomps, n_procs=n_procs)
+                update_mixcomps!(model.state, model.prior, model.y, update_mixcomps, n_procs=n_procs, tol_posdef=tol_posdef)
             end
 
             if (:lλ in update_outer)
@@ -173,7 +174,8 @@ function adapt!(model::Model_GPMTD;
     maxtries::Int=50,
     report_filename::String="out_progress.txt",
     update::Vector{Symbol}=[:intercept, :lλ, :ζ, :μ, :σ2,
-            :κ, :κ_hypers, :corParams, :corHypers, :fx] ) where T <: Real
+            :κ, :κ_hypers, :corParams, :corHypers, :fx],
+    tol_posdef=1.0e-9) where T <: Real
 
     target = (accptr_bnds[2] - accptr_bnds[1]) / 2.0
     d = Int(2)
@@ -202,7 +204,7 @@ function adapt!(model::Model_GPMTD;
 
         iter, accptr = mcmc!(model, n_iter_scale, save=false,
             report_filename=report_filename,
-            report_freq=n_iter_scale, update=update)
+            report_freq=n_iter_scale, update=update, tol_posdef=tol_posdef)
 
         for j = 1:model.L
             fails[j] = (accptr[j] < accptr_bnds[1])
@@ -242,7 +244,7 @@ function adapt!(model::Model_GPMTD;
 
                 iter, accptr = mcmc!(model, n_iter_scale, save=false,
                     report_filename=report_filename,
-                    report_freq=n_iter_scale, update=update)
+                    report_freq=n_iter_scale, update=update, tol_posdef=tol_posdef)
 
                 for j = 1:model.L
                     too_low = accptr[j] < (accptr_bnds[1] * 0.5)
@@ -283,7 +285,7 @@ function adapt!(model::Model_GPMTD;
 
     iter, accptr = mcmc!(model, n_iter_collectSS, save=false,
         report_filename=report_filename,
-        report_freq=1000, update=update)
+        report_freq=1000, update=update, tol_posdef=tol_posdef)
 
     for j = 1:model.L
         Sighat = model.state.mixcomps[j].runningSS_Met / float(model.state.adapt_iter)
@@ -315,7 +317,7 @@ function adapt!(model::Model_GPMTD;
 
         iter, accptr = mcmc!(model, n_iter_scale, save=false,
             report_filename=report_filename,
-            report_freq=n_iter_scale, update=update)
+            report_freq=n_iter_scale, update=update, tol_posdef=tol_posdef)
 
         for j = 1:model.L
             too_low = accptr[j] < accptr_bnds[1]

@@ -145,7 +145,7 @@ end
 
 ### worker function that operates on its own
 function update_mixcomp!(mixcomp::MixComponentNormal, prior::PriorMixcomponent_Normal,
-    y::Vector{T}, update::Vector{Symbol}=[:μ, :σ2, :κ, :corParams, :fx]) where T <: Real
+    y::Vector{T}, update::Vector{Symbol}=[:μ, :σ2, :κ, :corParams, :fx], tol_posdef=1.0e-9) where T <: Real
 
     nζ = length(mixcomp.ζon_indx)
 
@@ -175,7 +175,7 @@ function update_mixcomp!(mixcomp::MixComponentNormal, prior::PriorMixcomponent_N
 
             mixcomp.fx[ζoff_indx] = rfullcond_fstar!(mixcomp.fx[mixcomp.ζon_indx],
                 Cov.mat[mixcomp.ζon_indx, mixcomp.ζon_indx], Cov.mat[ζoff_indx, ζoff_indx],
-                Cov.mat[ζoff_indx, mixcomp.ζon_indx], mixcomp.rng)
+                Cov.mat[ζoff_indx, mixcomp.ζon_indx], mixcomp.rng, tol_posdef)
         end
 
     else
@@ -186,7 +186,7 @@ function update_mixcomp!(mixcomp::MixComponentNormal, prior::PriorMixcomponent_N
         end
 
         if (:fx in update)
-            Cov = PDMat_adj(mixcomp.Cor .* (mixcomp.κ * mixcomp.σ2))
+            Cov = PDMat_adj(mixcomp.Cor .* (mixcomp.κ * mixcomp.σ2), tol_posdef)
             mixcomp.fx = rand(mixcomp.rng, Distributions.MvNormal( Cov.mat ) )
         end
     end
@@ -198,7 +198,7 @@ end
 ### master function that calls parallel updates
 function update_mixcomps!(state::State_GPMTD, prior::Prior_GPMTD, y::Vector{T},
     update::Vector{Symbol}=[:μ, :σ2, :κ, :corParams, :fx];
-    n_procs::Int=1) where T <: Real
+    n_procs::Int=1, tol_posdef=1.0e-9) where T <: Real
 
     L = length(state.mixcomps)
 
@@ -208,11 +208,11 @@ function update_mixcomps!(state::State_GPMTD, prior::Prior_GPMTD, y::Vector{T},
 
     if n_procs == 1
         for ℓ = 1:L
-            state.mixcomps[ℓ] = update_mixcomp!(state.mixcomps[ℓ], prior.mixcomps[ℓ], y, update)
+            state.mixcomps[ℓ] = update_mixcomp!(state.mixcomps[ℓ], prior.mixcomps[ℓ], y, update, tol_posdef)
         end
     elseif n_procs > 1
         state.mixcomps = pmap(update_mixcomp!, state.mixcomps, prior.mixcomps,
-            fill(y, L), fill(update, L)) # pmap will update in place on each worker, but we also need to return the mixcomps
+            fill(y, L), fill(update, L), fill(tol_posdef, L)) # pmap will update in place on each worker, but we also need to return the mixcomps
     end
 
     state.accpt = [ deepcopy(state.mixcomps[ℓ].accpt) for ℓ = 1:L ]

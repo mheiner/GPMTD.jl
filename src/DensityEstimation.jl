@@ -5,7 +5,7 @@ export getEyPy;
 
 function getEyPy(sims::Array, X_grid::Matrix{T},
     X::Matrix{T}, D::Vector{Matrix{T}}; densout::Bool=false, y_grid::Vector{T}=[0.0],
-    rng::MersenneTwister=MersenneTwister()) where T <: Real
+    rng::MersenneTwister=MersenneTwister(); tol=1.0e-9) where T <: Real
 
     n_star, L = size(X_grid)
     n_y = length(y_grid)
@@ -20,11 +20,11 @@ function getEyPy(sims::Array, X_grid::Matrix{T},
     Fstar = Array{Float64}(undef, L, n_star, nsim)
 
     for j = 1:L
-        Fstar[j,:,:] = hcat([ sims[ii][:mixcomps][j][:μ] .+ rfullcond_fstar(sims[ii][:mixcomps][j][:fx],
-        covMat(D[j], sims[ii][:mixcomps][j][:κ]*sims[ii][:mixcomps][j][:σ2], sims[ii][:mixcomps][j][:corParams]),
-        covMat(Dstar[j], sims[ii][:mixcomps][j][:κ]*sims[ii][:mixcomps][j][:σ2], sims[ii][:mixcomps][j][:corParams]),
-        covMat(Dstdat[j], sims[ii][:mixcomps][j][:κ]*sims[ii][:mixcomps][j][:σ2], sims[ii][:mixcomps][j][:corParams]),
-        rng) for ii = 1:nsim ]...)
+        Fstar[j,:,:] = hcat([ sims[ii][:mixcomps][j][:μ] .+ rfullcond_fstar!(sims[ii][:mixcomps][j][:fx],
+            covMat(D[j], sims[ii][:mixcomps][j][:κ]*sims[ii][:mixcomps][j][:σ2], sims[ii][:mixcomps][j][:corParams]),
+            covMat(Dstar[j], sims[ii][:mixcomps][j][:κ]*sims[ii][:mixcomps][j][:σ2], sims[ii][:mixcomps][j][:corParams]),
+            covMat(Dstdat[j], sims[ii][:mixcomps][j][:κ]*sims[ii][:mixcomps][j][:σ2], sims[ii][:mixcomps][j][:corParams]),
+            rng, tol) for ii = 1:nsim ]...)
     end
 
     Ey = Matrix{Float64}(undef, n_star, nsim)

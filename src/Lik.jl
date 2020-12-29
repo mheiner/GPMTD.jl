@@ -52,9 +52,11 @@ function llik(model::Model_GPMTD)
     return llik
 end
 
-function llik_oos(model::Model_GPMTD, postsamp::Dict{Symbol, Any},
+function llik_oos!(model::Model_GPMTD, postsamp::Dict{Symbol, Any},
                   y_oos::Vector{T}, D_oos::Vector{Array{T, 2}},
-                  D_oos_is::Vector{Array{T, 2}}) where T <: Real
+                  D_oos_is::Vector{Array{T, 2}}; tol=1.0e-9) where T <: Real
+
+    ## Modifes the state of the rng in the model object
 
     # D_oos[j] = pairDistMat( X_oos[:,[j]] )
     # D_oos_is[j] = pairDistMat( X_oos[:,[j]],  model.X[:,[j]] )
@@ -62,11 +64,11 @@ function llik_oos(model::Model_GPMTD, postsamp::Dict{Symbol, Any},
     llik = 0.0
     lp = Vector{Float64}(undef, model.L+1)
 
-    Fstar = [ postsamp[:mixcomps][j][:μ] .+ rfullcond_fstar(postsamp[:mixcomps][j][:fx],
+    Fstar = [ postsamp[:mixcomps][j][:μ] .+ rfullcond_fstar!(postsamp[:mixcomps][j][:fx],
         covMat(model.D[j], postsamp[:mixcomps][j][:κ]*postsamp[:mixcomps][j][:σ2], postsamp[:mixcomps][j][:corParams]),
         covMat(D_oos[j], postsamp[:mixcomps][j][:κ]*postsamp[:mixcomps][j][:σ2], postsamp[:mixcomps][j][:corParams]),
         covMat(D_oos_is[j], postsamp[:mixcomps][j][:κ]*postsamp[:mixcomps][j][:σ2], postsamp[:mixcomps][j][:corParams]),
-        model.state.mixcomps[j].rng) for j = 1:model.L ]
+        model.state.mixcomps[j].rng, tol) for j = 1:model.L ]
 
     for i = 1:length(y_oos)
         lp[1] = postsamp[:lλ][1] - 0.5*log(2π*postsamp[:intercept].σ2) -

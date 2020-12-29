@@ -1,6 +1,6 @@
 # Update_mixcomps.jl
 
-export rfullcond_fstar;
+export rfullcond_fstar!;
 
 function update_μ_σ2!(mixcomp::MixComponentNormal, suffstat::Dict{Symbol, T},
     prior::PriorMixcomponent_Normal) where T <: Real
@@ -22,7 +22,7 @@ function update_μ_σ2!(mixcomp::MixComponentNormal, suffstat::Dict{Symbol, T},
     return nothing
 end
 
-# function rpost_f(y::Vector{T}, μ::T, σ2::T, κ::T, Cor::Symmetric{Float64, Matrix{Float64}},
+# function rpost_f!(y::Vector{T}, μ::T, σ2::T, κ::T, Cor::Symmetric{Float64, Matrix{Float64}},
 #     rng::Union{MersenneTwister, Threefry4x}) where T <: Real
 #     # conjugate update for MvNormal mean with prior mean μ, known general
 #     #   correlation matrix Cor, signal-to-noise ratio κ, and indep. noisy obs with variance σ2.
@@ -34,7 +34,7 @@ end
 #
 #     return rand(rng, Distributions.MvNormalCanon(h, J) )
 # end
-# function rpost_f(y::Vector{T}, μ::T, σ2::T, κ::T, Cor::Symmetric{Float64, Matrix{Float64}},
+# function rpost_f!(y::Vector{T}, μ::T, σ2::T, κ::T, Cor::Symmetric{Float64, Matrix{Float64}},
 #     rng::Union{MersenneTwister, Threefry4x}) where T <: Real
 #     # conjugate update for MvNormal mean with prior mean μ, known general
 #     #   correlation matrix Cor, signal-to-noise ratio κ, and indep. noisy obs with variance σ2.
@@ -44,7 +44,7 @@ end
 #
 #     return rand(rng, Distributions.MvNormalCanon(h, J) )
 # end
-function rpost_f(y::Vector{T}, μ::T, σ2::T, κ::T, Cor::Symmetric{Float64, Matrix{Float64}},
+function rpost_f!(y::Vector{T}, μ::T, σ2::T, κ::T, Cor::Symmetric{Float64, Matrix{Float64}},
     rng::Union{MersenneTwister, Threefry4x}) where T <: Real
     # conjugate update for MvNormal mean with prior mean μ, known general
     #   correlation matrix Cor, signal-to-noise ratio κ, and indep. noisy obs with variance σ2.
@@ -60,7 +60,7 @@ function rpost_f(y::Vector{T}, μ::T, σ2::T, κ::T, Cor::Symmetric{Float64, Mat
 end
 
 
-function rfullcond_fstar(f_ell::T, Celel::T, Cstst::T, Cstel::T,
+function rfullcond_fstar!(f_ell::T, Celel::T, Cstst::T, Cstel::T,
     rng::Union{MersenneTwister, Threefry4x}, tol=1.0e-10) where T <: Real
 
     ## here C is the **Covariance** matrix
@@ -74,22 +74,24 @@ function rfullcond_fstar(f_ell::T, Celel::T, Cstst::T, Cstel::T,
 
     return sqrt(Σ) * randn(rng) + μ
 end
-function rfullcond_fstar(f_ell::T, Celel::T,
+function rfullcond_fstar!(f_ell::T, Celel::T,
     Cstst::Matrix{T}, Cstel::Vector{T},
-    rng::Union{MersenneTwister, Threefry4x}) where T <: Real
+    rng::Union{MersenneTwister, Threefry4x}, tol=1.0e-10) where T <: Real
 
     ## here C is the **Covariance** matrix
 
     μ = Cstel .* f_ell ./ Celel
-    Σ = PDMat_adj(Symmetric(Cstst - Cstel * Cstel' ./ Celel))
+    Σ = PDMat_adj(Symmetric(Cstst - Cstel * Cstel' ./ Celel), tol)
 
     return rand(rng, Distributions.MvNormal( μ, Σ ) )
 end
-function rfullcond_fstar(f_ell::Vector{T}, Celel::Matrix{T},
+function rfullcond_fstar!(f_ell::Vector{T}, Celel::Matrix{T},
     Cstst::T, Cstel::Vector{T},
     rng::Union{MersenneTwister, Threefry4x}, tol=1.0e-10) where T <: Real
 
     ## here C is the **Covariance** matrix
+
+    Celel = PDMat_adj(Celel, tol)
 
     μ = Cstel' * ( Celel \ f_ell )
     Σ = Cstst - Cstel' * ( Celel \ Cstel )
@@ -100,7 +102,7 @@ function rfullcond_fstar(f_ell::Vector{T}, Celel::Matrix{T},
 
     return sqrt(Σ) * randn(rng) + μ
 end
-# function rfullcond_fstar(f_ell::Vector{T}, Celel::Matrix{T},
+# function rfullcond_fstar!(f_ell::Vector{T}, Celel::Matrix{T},
 #     Cstst::Matrix{T}, Cstel::Matrix{T},
 #     rng::Union{MersenneTwister, Threefry4x}) where T <: Real
 #
@@ -111,14 +113,13 @@ end
 #
 #     return rand(rng, Distributions.MvNormal( μ, Σ ) )
 # end
-function rfullcond_fstar(f_ell::Vector{T}, Celel::Matrix{T},
+function rfullcond_fstar!(f_ell::Vector{T}, Celel::Matrix{T},
     Cstst::Matrix{T}, Cstel::Matrix{T},
-    rng::Union{MersenneTwister, Threefry4x}) where T <: Real
+    rng::Union{MersenneTwister, Threefry4x}, tol=1.0e-10) where T <: Real
 
     ## here C is the **Covariance** matrix
-    tol = 1.0e-3
 
-    Celel = PDMat_adj(Celel)
+    Celel = PDMat_adj(Celel, tol)
 
     μ = Cstel * ( Celel \ f_ell )
     Σ = PDMat_adj(Symmetric(Cstst - X_invA_Xt(Celel, Cstel) ), tol)
@@ -127,7 +128,7 @@ function rfullcond_fstar(f_ell::Vector{T}, Celel::Matrix{T},
 end
 
 
-# function rfullcond_fstar_canon(fx::Vector{T}, ## already indexed
+# function rfullcond_fstar!_canon(fx::Vector{T}, ## already indexed
 #     Cov::PDMat, on_indx::Vector{Int}, off_indx::Vector{Int},
 #     rng::Union{MersenneTwister, Threefry4x}) where T <: Real
 #
@@ -163,7 +164,7 @@ function update_mixcomp!(mixcomp::MixComponentNormal, prior::PriorMixcomponent_N
         end
 
         if (:fx in update)
-            mixcomp.fx[mixcomp.ζon_indx] = rpost_f(y[mixcomp.ζon_indx], mixcomp.μ, mixcomp.σ2,
+            mixcomp.fx[mixcomp.ζon_indx] = rpost_f!(y[mixcomp.ζon_indx], mixcomp.μ, mixcomp.σ2,
                 mixcomp.κ, Symmetric(mixcomp.Cor[mixcomp.ζon_indx, mixcomp.ζon_indx]), mixcomp.rng)
 
             ζoff_indx = setdiff( 1:length(y) , mixcomp.ζon_indx )
@@ -172,7 +173,7 @@ function update_mixcomp!(mixcomp::MixComponentNormal, prior::PriorMixcomponent_N
             # mixcomp.fx[ζoff_indx] = rfullcond_fstar_canon(mixcomp.fx[mixcomp.ζon_indx], Cov,
             #     mixcomp.ζon_indx, ζoff_indx, mixcomp.rng)
 
-            mixcomp.fx[ζoff_indx] = rfullcond_fstar(mixcomp.fx[mixcomp.ζon_indx],
+            mixcomp.fx[ζoff_indx] = rfullcond_fstar!(mixcomp.fx[mixcomp.ζon_indx],
                 Cov.mat[mixcomp.ζon_indx, mixcomp.ζon_indx], Cov.mat[ζoff_indx, ζoff_indx],
                 Cov.mat[ζoff_indx, mixcomp.ζon_indx], mixcomp.rng)
         end

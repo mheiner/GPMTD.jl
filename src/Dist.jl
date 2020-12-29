@@ -13,7 +13,8 @@ function pairDistMat(X::Matrix{T}, Y::Matrix{T},
 end
 
 function expanD(D::Matrix{T}, x_new::Union{T, Vector{T}},
-    x_old::Matrix{T}) where T <: Real
+    x_old::Matrix{T}; front::Bool=true) where T <: Real
+    ## Note that x_new is one new point only
 
     if typeof(x_new) <: Real
         x_new = [x_new]
@@ -22,8 +23,17 @@ function expanD(D::Matrix{T}, x_new::Union{T, Vector{T}},
     x_new = reshape(x_new, 1, length(x_new))
     d_new = vec(pairDistMat(x_new, x_old))
 
-    A = vcat(0.0, d_new)
-    B = Matrix( hcat( d_new, D )' )
+    if front
+        A = vcat(0.0, d_new)
+        B = Matrix( hcat( d_new, D )' )
 
-    return hcat( A, B )
+        Out = hcat( A, B )
+    else
+        A = Matrix( hcat( D, d_new ) )
+        B = vcat(d_new, 0.0)
+
+        Out = vcat( A, B' )
+    end
+
+    return Out
 end

@@ -5,7 +5,7 @@ export getEyPy;
 
 function getEyPy(sims::Array, X_grid::Matrix{T},
     X::Matrix{T}, D::Vector{Matrix{T}}; densout::Bool=false, y_grid::Vector{T}=[0.0],
-    rng::MersenneTwister=MersenneTwister(); tol=1.0e-9) where T <: Real
+    rng::MersenneTwister=MersenneTwister(), tol=1.0e-9) where T <: Real
 
     n_star, L = size(X_grid)
     n_y = length(y_grid)

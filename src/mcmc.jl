@@ -33,20 +33,20 @@ function postSimsInit(n_keep::Int, init_state::Union{State_GPMTD},
 end
 
 ## MCMC timing for benchmarks
-function timemod!(n::Int64, model::Union{Model_GPMTD}, niter::Int, outfilename::String; tol_posdef=1.0e-9)
+function timemod!(n::Int64, model::Union{Model_GPMTD}, niter::Int, outfilename::String; n_procs=1, save=false, tol_posdef=1.0e-9)
     outfile = open(outfilename, "a+")
-    write(outfile, "timing for $(niter) iterations each:\n")
+    write(outfile, "\ntiming for $(niter) iterations each with $(n_procs) parallel processes:\n")
     for i in 1:n
-        tinfo = @timed mcmc!(model, niter, tol_posdef=tol_posdef)
+        tinfo = @timed mcmc!(model, niter, n_procs=n_procs, save=save, tol_posdef=tol_posdef)
         write(outfile, "trial $(i), elapsed: $(tinfo[2]) seconds, allocation: $(tinfo[3]/1.0e6) Megabytes\n")
     end
     close(outfile)
 end
 
 ## estimate time remaining
-function etr(timestart::DateTime, n_keep::Int, thin::Int, outfilename::String)
+function etr(timestart::DateTime, n_iter_timed::Int, n_keep::Int, thin::Int, outfilename::String)
     timeendburn = now()
-    durperiter = (timeendburn - timestart).value / 1.0e5 # in milliseconds
+    durperiter = (timeendburn - timestart).value / float(n_iter_timed) # in milliseconds
     milsecremaining = durperiter * (n_keep * thin)
     estimatedfinish = now() + Dates.Millisecond(Int64(round(milsecremaining)))
     report_file = open(outfilename, "a+")

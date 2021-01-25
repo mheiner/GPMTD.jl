@@ -1,6 +1,6 @@
 # Lik.jl
 
-export llik, llik_oos, Qresid!, Qresid_cond!;
+export llik, llik_oos!, Qresid!, Qresid_cond!;
 
 function ldensy_marg(y::Vector{T}, μ::T, σ2::T, Cov::PDMat) where T <: Real
     ## assumes mean zero
